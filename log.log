@@ -1,0 +1,1 @@
+g++ -o test_resize main.o opt.c dict.c eval.c hscale.c initFilter.c input.c mem.c options.c output.c pixdesc.c rational.c resize.c slice.c vscale.c -Ilibavutil -D__STDC_CONSTANT_MACROS -fpermissive -std=c11 -lstdc++
