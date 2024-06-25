@@ -61,17 +61,12 @@ static int writeAVFrame(const char *output_filename, AVFrame *frame) {
         return -1;
     }
 
-    // 计算总数据长度
-    uint32_t length = frame->Ysize + 2 * frame->UVsize;
-
     // 写入 Y 数据
     fwrite(frame->data[0], sizeof(uint8_t), frame->Ysize, file);
 
-    // 写入 U 数据
     fwrite(frame->data[1], sizeof(uint8_t), frame->UVsize, file);
-
-    // 写入 V 数据
-    fwrite(frame->data[2], sizeof(uint8_t), frame->UVsize, file);
+    if(frame->UVsize == frame->Ysize / 4 || frame->UVsize == frame->Ysize)  // 说明不是NV12 或者 NV21，UV分开存储
+        fwrite(frame->data[2], sizeof(uint8_t), frame->UVsize, file);
 
     fclose(file);
     return 0;
@@ -91,7 +86,8 @@ static int initAVFrame(AVFrame *frame, unsigned int width, unsigned int height, 
     frame->linesize[0] = width;
     frame->linesize[3] = 0;
     if (pixelFormat == AV_PIX_FMT_NV21 || pixelFormat == AV_PIX_FMT_NV12 ) {
-        frame->linesize[1] = width / 2;
+
+        frame->linesize[1] = width;
         frame->linesize[2] = 0;
         frame->subsample = 1;
         frame->Ysize = frame->linesize[0] * height;
@@ -169,13 +165,16 @@ int main(int argc, char* argv[])
     outframe = av_mallocz(sizeof(AVFrame));
 
     initAVFrame(outframe, dstW, dstH, infmt);
-    // if (outframe->data[0] = NULL){
+    // 过量分配内存，防止溢出
     outframe->data[0] = av_mallocz(outframe->Ysize);
     outframe->data[1] = av_mallocz(outframe->Ysize);
     outframe->data[2] = av_mallocz(outframe->Ysize);
-    // }
-    if(ret = readAVFrame(infilename, inframe) !=0 )
+
+    if(ret = readAVFrame(infilename, inframe) !=0 ){
+        printf("Read Data Failed!\n");
         return -1;
+    }
+
 
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(infmt);  // 获取format
     struct SwsContext *sws;
