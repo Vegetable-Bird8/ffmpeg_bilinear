@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
         return -1;
 
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(infmt);  // 获取format
-    struct SwsContext *sws, *isws[2];
+    struct SwsContext *sws;
     ScaleContext *scale = (ScaleContext *)malloc(sizeof(ScaleContext));  //分配内存
 
     //初始化scale
@@ -190,54 +190,49 @@ int main(int argc, char* argv[])
     scale->out_v_chr_pos = -513;
     scale->in_h_chr_pos  = -513;
     scale->in_v_chr_pos  = -513;
-    scale->interlaced = 0;
+    scale->in_color_matrix = "auto";
+    scale->in_range = NULL;
     sws_freeContext(scale->sws);
-    sws_freeContext(scale->isws[0]);
-    sws_freeContext(scale->isws[1]);
 
+    scale->sws = NULL;
 
-    scale->isws[0] = scale->isws[1] = scale->sws = NULL;
+    // struct SwsContext **swscs =
+    int i = 0;
 
-    struct SwsContext **swscs[3] = {&scale->sws, &scale->isws[0], &scale->isws[1]};
-    int i;
-
-    for (i = 0; i < 3; i++) {
-        int in_v_chr_pos = scale->in_v_chr_pos, out_v_chr_pos = scale->out_v_chr_pos;
-        struct SwsContext **s = swscs[i];
-        *s = sws_alloc_context();
-        if (!*s)
-            return AVERROR(ENOMEM);
-        // 赋值操作
-        (*s)->srcW = srcW;
-        (*s)->srcH = srcH >> !!i;
-        (*s)->srcFormat = infmt;
-        (*s)->dstW = dstW;
-        (*s)->dstH = dstH >> !!i;
-        (*s)->dstFormat = outfmt;
-        (*s)->flags = scale->flags;
-        (*s)->chrDstHSubSample = (*s)->chrDstVSubSample = (*s)->chrSrcHSubSample = (*s)->chrSrcVSubSample = inframe->subsample;
-        /* Override YUV420P default settings to have the correct (MPEG-2) chroma positions
-        * MPEG-2 chroma positions are used by convention
-        * XXX: support other 4:2:0 pixel formats */
-        if (infmt == AV_PIX_FMT_YUV420P && in_v_chr_pos == -513) {
-            in_v_chr_pos = (i == 0) ? 128 : (i == 1) ? 64 : 192;
-        }
-
-        if (outfmt == AV_PIX_FMT_YUV420P && out_v_chr_pos == -513) {
-            out_v_chr_pos = (i == 0) ? 128 : (i == 1) ? 64 : 192;
-        }
-
-        (*s)->src_h_chr_pos = scale->in_h_chr_pos;
-        (*s)->src_v_chr_pos = in_v_chr_pos;
-        (*s)->dst_h_chr_pos = scale->out_h_chr_pos;
-        (*s)->dst_v_chr_pos = out_v_chr_pos;
-
-        if ((ret = sws_init_context(*s, NULL, NULL)) < 0) // 初始化，这里初始化了filter
-            return ret;
-        if (!scale->interlaced)
-            break; // 仅仅需要初始化第一个，因为不需要隔行扫描
-
+    // for (i = 0; i < 3; i++) {
+    int in_v_chr_pos = scale->in_v_chr_pos, out_v_chr_pos = scale->out_v_chr_pos;
+    struct SwsContext **s = &scale->sws;
+    *s = sws_alloc_context();
+    if (!*s)
+        return AVERROR(ENOMEM);
+    // 赋值操作
+    (*s)->srcW = srcW;
+    (*s)->srcH = srcH >> !!i;
+    (*s)->srcFormat = infmt;
+    (*s)->dstW = dstW;
+    (*s)->dstH = dstH >> !!i;
+    (*s)->dstFormat = outfmt;
+    (*s)->flags = scale->flags;
+    (*s)->chrDstHSubSample = (*s)->chrDstVSubSample = (*s)->chrSrcHSubSample = (*s)->chrSrcVSubSample = inframe->subsample;
+    /* Override YUV420P default settings to have the correct (MPEG-2) chroma positions
+    * MPEG-2 chroma positions are used by convention
+    * XXX: support other 4:2:0 pixel formats */
+    if (infmt == AV_PIX_FMT_YUV420P && in_v_chr_pos == -513) {
+        in_v_chr_pos = (i == 0) ? 128 : (i == 1) ? 64 : 192;
     }
+
+    if (outfmt == AV_PIX_FMT_YUV420P && out_v_chr_pos == -513) {
+        out_v_chr_pos = (i == 0) ? 128 : (i == 1) ? 64 : 192;
+    }
+
+    (*s)->src_h_chr_pos = scale->in_h_chr_pos;
+    (*s)->src_v_chr_pos = in_v_chr_pos;
+    (*s)->dst_h_chr_pos = scale->out_h_chr_pos;
+    (*s)->dst_v_chr_pos = out_v_chr_pos;
+
+    if ((ret = sws_init_context(*s, NULL, NULL)) < 0) // 初始化，这里初始化了filter
+        return ret;
+
     //调用filter_frame来进行实际的缩放操作
     if(ret = filter_frame(scale, inframe, outframe) < 0){
         fprintf(stderr, "Scale failed! \n");
@@ -247,10 +242,14 @@ int main(int argc, char* argv[])
     if (ret = writeAVFrame(outfilename,outframe) != 0){
         printf("Data dump failed! \n");
         return -1;
+    }else{
+        printf("Data dump success! \n");
     }
+
     av_free(inframe);
     av_free(outframe);
     inframe = NULL;
     outframe = NULL;
+
     return 0;
 }

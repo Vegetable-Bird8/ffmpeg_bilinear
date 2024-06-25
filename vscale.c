@@ -258,7 +258,7 @@ void ff_init_vscale_pfn(SwsContext *c,
 {
     VScalerContext *lumCtx = NULL;
     VScalerContext *chrCtx = NULL;
-    int idx = c->numDesc - (c->is_internal_gamma ? 2 : 1); //FIXME avoid hardcoding indexes
+    int idx = c->numDesc - 1; //(c->is_internal_gamma ? 2 : 1); //FIXME avoid hardcoding indexes
 
     if (isPlanarYUV(c->dstFormat) || (isGray(c->dstFormat) && !isALPHA(c->dstFormat))) {
         if (!isGray(c->dstFormat)) {

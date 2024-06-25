@@ -127,8 +127,8 @@ SwsContext *sws_alloc_context(void)
     //     av_opt_set_defaults(c);
     // }
     c->src0Alpha = 0;
-    c->dither = NB_SWS_DITHER;
-    c->alphablend = SWS_ALPHA_BLEND_NB-1;
+    c->dither = SWS_DITHER_AUTO;
+    c->alphablend = SWS_ALPHA_BLEND_NONE;
 
     return c;
 }
@@ -801,31 +801,6 @@ SwsFunc ff_getSwsFunc(SwsContext *c)
     return swscale;
 }
 
-void ff_sws_init_range_convert(SwsContext *c)
-{
-    c->lumConvertRange = NULL;
-    c->chrConvertRange = NULL;
-    if (c->srcRange != c->dstRange && !isAnyRGB(c->dstFormat)) {
-        if (c->dstBpc <= 14) {
-            if (c->srcRange) {
-                c->lumConvertRange = lumRangeFromJpeg_c;
-                c->chrConvertRange = chrRangeFromJpeg_c;
-            } else {
-                c->lumConvertRange = lumRangeToJpeg_c;
-                c->chrConvertRange = chrRangeToJpeg_c;
-            }
-        // } else {  //这里应该走不到，之后需要优化
-        //     if (c->srcRange) {
-        //         c->lumConvertRange = lumRangeFromJpeg16_c;
-        //         c->chrConvertRange = chrRangeFromJpeg16_c;
-        //     } else {
-        //         c->lumConvertRange = lumRangeToJpeg16_c;
-        //         c->chrConvertRange = chrRangeToJpeg16_c;
-        //     }
-        }
-    }
-}
-
 int sws_setColorspaceDetails(struct SwsContext *c, const int inv_table[4],
                              int srcRange, const int table[4], int dstRange,
                              int brightness, int contrast, int saturation)
@@ -838,20 +813,20 @@ int sws_setColorspaceDetails(struct SwsContext *c, const int inv_table[4],
     desc_dst = av_pix_fmt_desc_get(c->dstFormat);
     desc_src = av_pix_fmt_desc_get(c->srcFormat);
 
-    if(!isYUV(c->dstFormat) && !isGray(c->dstFormat))
-        dstRange = 0;
-    if(!isYUV(c->srcFormat) && !isGray(c->srcFormat))
-        srcRange = 0;
+    // if(!isYUV(c->dstFormat) && !isGray(c->dstFormat))
+    //     dstRange = 0;
+    // if(!isYUV(c->srcFormat) && !isGray(c->srcFormat))
+    //     srcRange = 0;
 
-    if (c->srcRange != srcRange ||
-        c->dstRange != dstRange ||
-        c->brightness != brightness ||
-        c->contrast   != contrast ||
-        c->saturation != saturation ||
-        memcmp(c->srcColorspaceTable, inv_table, sizeof(int) * 4) ||
-        memcmp(c->dstColorspaceTable,     table, sizeof(int) * 4)
-    )
-        need_reinit = 1;
+    // if (c->srcRange != srcRange ||
+    //     c->dstRange != dstRange ||
+    //     c->brightness != brightness ||
+    //     c->contrast   != contrast ||
+    //     c->saturation != saturation ||
+    //     memcmp(c->srcColorspaceTable, inv_table, sizeof(int) * 4) ||
+    //     memcmp(c->dstColorspaceTable,     table, sizeof(int) * 4)
+    // )
+    //     need_reinit = 1;
 
     memmove(c->srcColorspaceTable, inv_table, sizeof(int) * 4);
     memmove(c->dstColorspaceTable, table, sizeof(int) * 4);
@@ -866,96 +841,17 @@ int sws_setColorspaceDetails(struct SwsContext *c, const int inv_table[4],
 
     //The srcBpc check is possibly wrong but we seem to lack a definitive reference to test this
     //and what we have in ticket 2939 looks better with this check
-    if (need_reinit && (c->srcBpc == 8 || !isYUV(c->srcFormat)))
-        ff_sws_init_range_convert(c);
+    // if (need_reinit && (c->srcBpc == 8 || !isYUV(c->srcFormat)))  不支持非YUV的数据
+    //     ff_sws_init_range_convert(c);
     c->dstFormatBpp = av_get_bits_per_pixel(desc_dst);
     c->srcFormatBpp = av_get_bits_per_pixel(desc_src);
-
-    if (c->cascaded_context[c->cascaded_mainindex])
-        return sws_setColorspaceDetails(c->cascaded_context[c->cascaded_mainindex],inv_table, srcRange,table, dstRange, brightness,  contrast, saturation);
 
     if (!need_reinit)
         return 0;
 
     if ((isYUV(c->dstFormat) || isGray(c->dstFormat)) && (isYUV(c->srcFormat) || isGray(c->srcFormat))) {
-        // if (!c->cascaded_context[0] &&
-        //     memcmp(c->dstColorspaceTable, c->srcColorspaceTable, sizeof(int) * 4) &&
-        //     c->srcW && c->srcH && c->dstW && c->dstH) {
-        //     enum AVPixelFormat tmp_format;
-        //     int tmp_width, tmp_height;
-        //     int srcW = c->srcW;
-        //     int srcH = c->srcH;
-        //     int dstW = c->dstW;
-        //     int dstH = c->dstH;
-        //     int ret;
-        //     printf("YUV color matrix differs for YUV->YUV, using intermediate RGB to convert\n");
-
-            // if (isNBPS(c->dstFormat) || is16BPS(c->dstFormat)) {
-            //     if (isALPHA(c->srcFormat) && isALPHA(c->dstFormat)) {
-            //         tmp_format = AV_PIX_FMT_BGRA64;
-            //     } else {
-            //         tmp_format = AV_PIX_FMT_BGR48;
-            //     }
-            // } else {
-            //     if (isALPHA(c->srcFormat) && isALPHA(c->dstFormat)) {
-            //         tmp_format = AV_PIX_FMT_BGRA;
-            //     } else {
-            //         tmp_format = AV_PIX_FMT_BGR24;
-            //     }
-            // }
-
-        //     if (srcW*srcH > dstW*dstH) {
-        //         tmp_width  = dstW;
-        //         tmp_height = dstH;
-        //     } else {
-        //         tmp_width  = srcW;
-        //         tmp_height = srcH;
-        //     }
-
-        //     ret = av_image_alloc(c->cascaded_tmp, c->cascaded_tmpStride,
-        //                         tmp_width, tmp_height, tmp_format, 64);
-        //     if (ret < 0)
-        //         return ret;
-
-        //     c->cascaded_context[0] = sws_alloc_set_opts(srcW, srcH, c->srcFormat,
-        //                                                 tmp_width, tmp_height, tmp_format,
-        //                                                 c->flags, c->param);
-        //     if (!c->cascaded_context[0])
-        //         return -1;
-
-        //     c->cascaded_context[0]->alphablend = c->alphablend;
-        //     ret = sws_init_context(c->cascaded_context[0], NULL , NULL);
-        //     if (ret < 0)
-        //         return ret;
-        //     //we set both src and dst depending on that the RGB side will be ignored
-        //     sws_setColorspaceDetails(c->cascaded_context[0], inv_table,
-        //                              srcRange, table, dstRange,
-        //                              brightness, contrast, saturation);
-
-        //     c->cascaded_context[1] = sws_getContext(tmp_width, tmp_height, tmp_format,
-        //                                             dstW, dstH, c->dstFormat,
-        //                                             c->flags, NULL, NULL, c->param);
-        //     if (!c->cascaded_context[1])
-        //         return -1;
-        //     sws_setColorspaceDetails(c->cascaded_context[1], inv_table,
-        //                              srcRange, table, dstRange,
-        //                              0, 1 << 16, 1 << 16);
-        //     return 0;
-        // }
         return -1;
     }
-
-    // if (!isYUV(c->dstFormat) && !isGray(c->dstFormat)) {
-    //     ff_yuv2rgb_c_init_tables(c, inv_table, srcRange, brightness,
-    //                              contrast, saturation);
-    //     // FIXME factorize
-
-    //     if (ARCH_PPC)
-    //         ff_yuv2rgb_init_tables_ppc(c, inv_table, brightness,
-    //                                    contrast, saturation);
-    // }
-
-    // fill_rgb2yuv_table(c, table, dstRange);
 
     return 0;
 }
@@ -984,8 +880,8 @@ int sws_init_context(SwsContext *c, SwsFilter *srcFilter, SwsFilter *dstFilter)
 
     unscaled = (srcW == dstW && srcH == dstH);
     //不做jpeg相关支持，写死
-    c->srcRange |= 0;
-    c->dstRange |= 0;
+    c->srcRange = 0;
+    c->dstRange = 0;
 
     if(srcFormat!=c->srcFormat || dstFormat!=c->dstFormat)
         printf("deprecated pixel format used, make sure you did set range correctly\n");
@@ -1060,7 +956,7 @@ int sws_init_context(SwsContext *c, SwsFilter *srcFilter, SwsFilter *dstFilter)
      * some special code for the first and last pixel */
 
     // hardcoded for now
-    c->gamma_value = 2.2;
+    // c->gamma_value = 2.2;
     {
         const int filterAlign = 4;
         if ((ret = initFilter(&c->hLumFilter, &c->hLumFilterPos,
@@ -1102,7 +998,9 @@ int sws_init_context(SwsContext *c, SwsFilter *srcFilter, SwsFilter *dstFilter)
     for (int i = 0; i < 4; i++)
         c->dither_error[i] = av_mallocz((c->dstW+2) * sizeof(int));
         // FF_ALLOCZ_OR_GOTO(c, c->dither_error[i], (c->dstW+2) * sizeof(int), fail);
-
+    c->canMMXEXTBeUsed = dstW >= srcW && (dstW & 31) == 0 &&
+                            c->chrDstW >= c->chrSrcW &&
+                            (srcW & 15) == 0;
     // 64 / c->scalingBpp is the same as 16 / sizeof(scaling_intermediate)
     c->uv_off   = (dst_stride>>1) + 64 / (c->dstBpc &~ 7);
     c->uv_offx2 = dst_stride + 16;

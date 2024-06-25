@@ -255,11 +255,11 @@ int ff_init_filters(SwsContext * c)
     int num_vdesc = isPlanarYUV(c->dstFormat) && !isGray(c->dstFormat) ? 2 : 1;
     int need_lum_conv = c->lumToYV12 || c->readLumPlanar || c->alpToYV12 || c->readAlpPlanar;
     int need_chr_conv = c->chrToYV12 || c->readChrPlanar;
-    int need_gamma = c->is_internal_gamma;
+
     int srcIdx, dstIdx;
     int dst_stride = FFALIGN(c->dstW * sizeof(int16_t) + 66, 16);
 
-    uint32_t * pal = usePal(c->srcFormat) ? c->pal_yuv : (uint32_t*)c->input_rgb2yuv_table;
+    uint32_t * pal = (uint32_t*)c->input_rgb2yuv_table;
     int res = 0;
 
     int lumBufSize;
@@ -276,9 +276,9 @@ int ff_init_filters(SwsContext * c)
     num_cdesc = need_chr_conv ? 2 : 1;
 
     c->numSlice = FFMAX(num_ydesc, num_cdesc) + 2;
-    c->numDesc = num_ydesc + num_cdesc + num_vdesc + (need_gamma ? 2 : 0);
-    c->descIndex[0] = num_ydesc + (need_gamma ? 1 : 0);
-    c->descIndex[1] = num_ydesc + num_cdesc + (need_gamma ? 1 : 0);
+    c->numDesc = num_ydesc + num_cdesc + num_vdesc; //+(need_gamma ? 2 : 0);
+    c->descIndex[0] = num_ydesc; // + (need_gamma ? 1 : 0);
+    c->descIndex[1] = num_ydesc + num_cdesc;// + (need_gamma ? 1 : 0);
 
 
 
@@ -320,29 +320,29 @@ int ff_init_filters(SwsContext * c)
     //     if (res < 0) goto cleanup;
     //     ++index;
     // }
-    //这里也不需要 随后注释掉
-    if (need_lum_conv) {
-        res = ff_init_desc_fmt_convert(&c->desc[index], &c->slice[srcIdx], &c->slice[dstIdx], pal);
-        if (res < 0) goto cleanup;
-        c->desc[index].alpha = c->needAlpha;
-        ++index;
-        srcIdx = dstIdx;
-    }
+    //这里是也不需要 随后注释掉
+    // if (need_lum_conv) {
+    //     res = ff_init_desc_fmt_convert(&c->desc[index], &c->slice[srcIdx], &c->slice[dstIdx], pal);
+    //     if (res < 0) goto cleanup;
+    //     c->desc[index].alpha = c->needAlpha;
+    //     ++index;
+    //     srcIdx = dstIdx;
+    // }
 
 
     dstIdx = FFMAX(num_ydesc, num_cdesc);
     res = ff_init_desc_hscale(&c->desc[index], &c->slice[srcIdx], &c->slice[dstIdx], c->hLumFilter, c->hLumFilterPos, c->hLumFilterSize, c->lumXInc);
     // 在这里把 c->desc[index] 指向了c->slice[srcIdx]的地址
     if (res < 0) goto cleanup;
-    c->desc[index].alpha = c->needAlpha;
+    // c->desc[index].alpha = c->needAlpha;
 
 
     ++index;
     {
         srcIdx = 0;
         dstIdx = 1;
-        // 删除
-        if (need_chr_conv) {
+
+        if (need_chr_conv) {   // NV12或者21需要
             res = ff_init_desc_cfmt_convert(&c->desc[index], &c->slice[srcIdx], &c->slice[dstIdx], pal);
             if (res < 0) goto cleanup;
             ++index;

@@ -9,15 +9,14 @@ This is the part that do the actual scale
 #include <stdio.h>
 #include "swscale.h"
 #include "swscale_internal.h"
-#include "log.h"
+// #include "log.h"
 #include "mathematics.h"
 // #include "opt.h"
 #include "parseutils.h"
 #include "pixdesc.h"
 // #include "imgutils.h"
-#include "avassert.h"
+// #include "avassert.h"
 
-#include "avassert.h"
 #include "avutil.h"
 #include "pixdesc.h"
 #include "bswap.h"
@@ -27,17 +26,6 @@ This is the part that do the actual scale
 #include "mathematics.h"
 #include "pixdesc.h"
 #include "config.h"
-// #include "rgb2rgb.h"
-
-
-#define DEBUG_SWSCALE_BUFFERS 0
-#define DEBUG_BUFFERS(...)                      \
-    if (DEBUG_SWSCALE_BUFFERS)                  \
-        av_log(NULL, AV_LOG_DEBUG, __VA_ARGS__)
-
-DECLARE_ALIGNED(8, static const uint8_t, sws_pb_64)[8] = {
-    64, 64, 64, 64, 64, 64, 64, 64
-};
 
 
 static void reset_ptr(const uint8_t *src[], enum AVPixelFormat format)
@@ -45,10 +33,10 @@ static void reset_ptr(const uint8_t *src[], enum AVPixelFormat format)
     // if (!isALPHA(format))
     src[3] = NULL;
     if (!isPlanar(format)) {
-        src[3] = src[2] = NULL;
+        src[1] = src[3] = src[2] = NULL;
 
-        if (!usePal(format))
-            src[1] = NULL;
+        // if (!usePal(format))
+        //     src[1] = NULL;
     }
 }
 
@@ -106,44 +94,7 @@ int sws_scale(struct SwsContext *c,
         printf( "Slice parameters %d, %d are invalid\n", srcSliceY, srcSliceH);
         return AVERROR(EINVAL);
     }
-    //这里不走，删除
-    if (c->gamma_flag && c->cascaded_context[0]) {
 
-
-        ret = sws_scale(c->cascaded_context[0],
-                    srcSlice, srcStride, srcSliceY, srcSliceH,
-                    c->cascaded_tmp, c->cascaded_tmpStride);
-
-        if (ret < 0)
-            return ret;
-
-        if (c->cascaded_context[2])
-            ret = sws_scale(c->cascaded_context[1], (const uint8_t * const *)c->cascaded_tmp, c->cascaded_tmpStride, srcSliceY, srcSliceH, c->cascaded1_tmp, c->cascaded1_tmpStride);
-        else
-            ret = sws_scale(c->cascaded_context[1], (const uint8_t * const *)c->cascaded_tmp, c->cascaded_tmpStride, srcSliceY, srcSliceH, dst, dstStride);
-
-        if (ret < 0)
-            return ret;
-
-        if (c->cascaded_context[2]) {
-            ret = sws_scale(c->cascaded_context[2],
-                        (const uint8_t * const *)c->cascaded1_tmp, c->cascaded1_tmpStride, c->cascaded_context[1]->dstY - ret, c->cascaded_context[1]->dstY,
-                        dst, dstStride);
-        }
-        return ret;
-    }
-    // 这里也不走 删除
-    if (c->cascaded_context[0] && srcSliceY == 0 && srcSliceH == c->cascaded_context[0]->srcH) {
-        ret = sws_scale(c->cascaded_context[0],
-                        srcSlice, srcStride, srcSliceY, srcSliceH,
-                        c->cascaded_tmp, c->cascaded_tmpStride);
-        if (ret < 0)
-            return ret;
-        ret = sws_scale(c->cascaded_context[1],
-                        (const uint8_t * const * )c->cascaded_tmp, c->cascaded_tmpStride, 0, c->cascaded_context[0]->dstH,
-                        dst, dstStride);
-        return ret;
-    }
     // 内存拷贝，将输入和输出的数据拷贝到src2和dst2中
     memcpy(src2, srcSlice, sizeof(src2));
     memcpy(dst2, dst, sizeof(dst2));
@@ -156,10 +107,10 @@ int sws_scale(struct SwsContext *c,
         printf( "bad src image pointers\n");
         return 0;
     }
-    // if (!check_image_pointers((const uint8_t* const*)dst, c->dstFormat, dstStride)) {
-    //     printf( "bad dst image pointers\n");
-    //     return 0;
-    // }
+    if (!check_image_pointers((const uint8_t* const*)dst, c->dstFormat, dstStride)) {
+        printf( "bad dst image pointers\n");
+        return 0;
+    }
 
     if (c->sliceDir == 0 && srcSliceY != 0 && srcSliceY + srcSliceH != c->srcH) {
         printf( "Slices start in the middle!\n");
@@ -190,8 +141,8 @@ int sws_scale(struct SwsContext *c,
         }
 
         src2[0] += (srcSliceH - 1) * srcStride[0];
-        if (!usePal(c->srcFormat))
-            src2[1] += ((srcSliceH >> c->chrSrcVSubSample) - 1) * srcStride[1];
+        // if (!usePal(c->srcFormat))
+        src2[1] += ((srcSliceH >> c->chrSrcVSubSample) - 1) * srcStride[1];
         src2[2] += ((srcSliceH >> c->chrSrcVSubSample) - 1) * srcStride[2];
         src2[3] += (srcSliceH - 1) * srcStride[3];
         dst2[0] += ( c->dstH                         - 1) * dstStride[0];
@@ -251,15 +202,8 @@ void sws_freeContext(SwsContext *c)
     av_freep(&c->yuvTable);
     av_freep(&c->formatConvBuffer);
 
-    sws_freeContext(c->cascaded_context[0]);
-    sws_freeContext(c->cascaded_context[1]);
-    sws_freeContext(c->cascaded_context[2]);
-    memset(c->cascaded_context, 0, sizeof(c->cascaded_context));
-    av_freep(&c->cascaded_tmp[0]);
-    av_freep(&c->cascaded1_tmp[0]);
-
-    av_freep(&c->gamma);
-    av_freep(&c->inv_gamma);
+    // av_freep(&c->gamma);
+    // av_freep(&c->inv_gamma);
 
     ff_free_filters(c);
 
@@ -325,31 +269,47 @@ int filter_frame(ScaleContext *scale, AVFrame *in, AVFrame *out)
     scale->vsub = desc->log2_chroma_h;
 
     int in_full, out_full, brightness, contrast, saturation;
-    const int *inv_table, *table;
+    int *inv_table, *table;
     sws_getColorspaceDetails(sws, (int **)&inv_table, &in_full,
                                 (int **)&table, &out_full,
                                 &brightness, &contrast, &saturation);
 
+    inv_table = ff_yuv2rgb_coeffs[2];
+
+    // if (scale->in_color_matrix)
+    //     inv_table = parse_yuv_type(scale->in_color_matrix, in->colorspace);
+    // if (scale->out_color_matrix)
+    //     table     = parse_yuv_type(scale->out_color_matrix, AVCOL_SPC_UNSPECIFIED);
+    // else if (scale->in_color_matrix)
     table = inv_table;
+
+    if (scale-> in_range != AVCOL_RANGE_UNSPECIFIED)
+        in_full  = (scale-> in_range == AVCOL_RANGE_JPEG);
+    else if (in_range != AVCOL_RANGE_UNSPECIFIED)
+        in_full  = (in_range == AVCOL_RANGE_JPEG);
+    if (scale->out_range != AVCOL_RANGE_UNSPECIFIED)
+        out_full = (scale->out_range == AVCOL_RANGE_JPEG);
+
+    // table = inv_table;
 
     // if (scale-> in_range != AVCOL_RANGE_UNSPECIFIED)
     //     in_full  = (scale->in_range == AVCOL_RANGE_JPEG);
     // else if (in_range != AVCOL_RANGE_UNSPECIFIED)
     //     in_full  = (in_range == AVCOL_RANGE_JPEG);
 
-    out_full = in_full;
+    // out_full = in_full;
 
     sws_setColorspaceDetails(scale->sws, inv_table, in_full,
                                 table, out_full,
                                 brightness, contrast, saturation);
-    if (scale->isws[0])
-        sws_setColorspaceDetails(scale->isws[0], inv_table, in_full,
-                                    table, out_full,
-                                    brightness, contrast, saturation);
-    if (scale->isws[1])
-        sws_setColorspaceDetails(scale->isws[1], inv_table, in_full,
-                                    table, out_full,
-                                    brightness, contrast, saturation);
+    // if (scale->isws[0])
+    //     sws_setColorspaceDetails(scale->isws[0], inv_table, in_full,
+    //                                 table, out_full,
+    //                                 brightness, contrast, saturation);
+    // if (scale->isws[1])
+    //     sws_setColorspaceDetails(scale->isws[1], inv_table, in_full,
+    //                                 table, out_full,
+    //                                 brightness, contrast, saturation);
 
     // scale_slice(scale, out, in, sws, 0, in->height, 1, 0);  //最后一个参数用于奇偶数行扫描，用不到
     scale_slice(out, in, sws, 0, in->height, 1);
