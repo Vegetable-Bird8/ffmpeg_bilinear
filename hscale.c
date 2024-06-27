@@ -132,7 +132,7 @@ int ff_init_desc_fmt_convert(SwsFilterDescriptor *desc, SwsSlice * src, SwsSlice
     li->pal = pal;
     desc->instance = li;
     // 有关alpha的全部优化掉
-    desc->alpha = isALPHA(src->fmt) && isALPHA(dst->fmt);
+    // desc->alpha = isALPHA(src->fmt) && isALPHA(dst->fmt);
     desc->src = src;
     desc->dst = dst;
     desc->process = &lum_convert;
@@ -154,7 +154,7 @@ int ff_init_desc_hscale(SwsFilterDescriptor *desc, SwsSlice *src, SwsSlice *dst,
 
     desc->instance = li;
 
-    desc->alpha = isALPHA(src->fmt) && isALPHA(dst->fmt);
+    // desc->alpha = isALPHA(src->fmt) && isALPHA(dst->fmt);
     desc->src = src;
     desc->dst = dst;
 
@@ -260,7 +260,6 @@ int ff_init_desc_chscale(SwsFilterDescriptor *desc, SwsSlice *src, SwsSlice *dst
 
     desc->instance = li;
 
-    desc->alpha = isALPHA(src->fmt) && isALPHA(dst->fmt);
     desc->src = src;
     desc->dst = dst;
 

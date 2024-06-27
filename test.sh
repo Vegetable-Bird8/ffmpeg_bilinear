@@ -25,6 +25,11 @@ expected_md5_3="634d26ba3314ef517ff1f45e11d9bd99"
 md5sum_output4=$(md5sum ./tm_yuv_420_smaller.yuv | awk '{print $1}')
 expected_md5_4="f99b1098136132b345a61f754ed5d254"
 
+# 运行第五个命令 该条和ffmpeg md5值一致
+./test_resize "/home/hsn/middleware/yuv_pic/nv21/JPEG_1920x1088_yuv420_nv21.yuv" 1920 1088 NV21 2560 1472 ./nv21_new.yuv
+md5sum_output5=$(md5sum ./nv21_new.yuv | awk '{print $1}')
+expected_md5_5="99682d514fa65e7d8fa67a92f8dcb14e"
+
 # 比较实际MD5值和期望的MD5值
 if [ "$md5sum_output1" == "$expected_md5_1" ]; then
     echo -e "${GREEN}第一个命令输出文件的MD5值与期望值匹配${NC}"
@@ -52,4 +57,11 @@ if [ "$md5sum_output4" == "$expected_md5_4" ]; then
 else
     echo -e "${RED}第四个命令输出文件的MD5值与期望值不匹配${NC}"
     echo $md5sum_output4
+fi
+
+if [ "$md5sum_output5" == "$expected_md5_5" ]; then
+    echo -e "${GREEN}第五个命令输出文件的MD5值与期望值匹配${NC}"
+else
+    echo -e "${RED}第五个命令输出文件的MD5值与期望值不匹配${NC}"
+    echo $md5sum_output5
 fi

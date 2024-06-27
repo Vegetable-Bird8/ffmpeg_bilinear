@@ -295,8 +295,8 @@ char av_get_picture_type_char(enum AVPictureType pict_type);
 
 #include "common.h"
 #include "error.h"
-#include "rational.h"
-#include "version.h"
+
+// #include "version.h"
 #include "macros.h"
 #include "mathematics.h"
 #include "log.h"
@@ -341,7 +341,7 @@ FILE *av_fopen_utf8(const char *path, const char *mode);
 /**
  * Return the fractional representation of the internal time base.
  */
-AVRational av_get_time_base_q(void);
+// AVRational av_get_time_base_q(void);
 
 #define AV_FOURCC_MAX_STRING_SIZE 32
 

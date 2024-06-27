@@ -12,10 +12,6 @@
 #include "pixdesc.h"
 
 #include "mathematics.h"
-// #include "opt.h"
-#include "parseutils.h"
-#include "pixdesc.h"
-// #include "imgutils.h"
 #include "avassert.h"
 #include "swscale.h"
 
@@ -65,7 +61,7 @@ static int writeAVFrame(const char *output_filename, AVFrame *frame) {
     fwrite(frame->data[0], sizeof(uint8_t), frame->Ysize, file);
 
     fwrite(frame->data[1], sizeof(uint8_t), frame->UVsize, file);
-    if(frame->UVsize == frame->Ysize / 4 || frame->UVsize == frame->Ysize)  // 说明不是NV12 或者 NV21，UV分开存储
+    if(frame->UVsize != frame->Ysize / 2)  // 说明不是NV12 或者 NV21，UV分开存储
         fwrite(frame->data[2], sizeof(uint8_t), frame->UVsize, file);
 
     fclose(file);
@@ -111,9 +107,7 @@ static int initAVFrame(AVFrame *frame, unsigned int width, unsigned int height, 
     frame->width = width;
     frame->height = height;
     frame->format = pixelFormat;
-    //初始化 之后考虑删掉
-    frame->sample_aspect_ratio.num = 0;
-    frame->sample_aspect_ratio.den = 1;
+
     frame->color_range = 2;  //JPEG
     frame->colorspace = 2;   //AVCOL_SPC_UNSPECIFIED
     return 0;
@@ -195,24 +189,25 @@ int main(int argc, char* argv[])
 
     scale->sws = NULL;
 
-    // struct SwsContext **swscs =
     int i = 0;
 
-    // for (i = 0; i < 3; i++) {
-    int in_v_chr_pos = scale->in_v_chr_pos, out_v_chr_pos = scale->out_v_chr_pos;
+    int in_v_chr_pos = scale->in_v_chr_pos;
+    int out_v_chr_pos = scale->out_v_chr_pos;
     struct SwsContext **s = &scale->sws;
-    *s = sws_alloc_context();
+    *s = av_mallocz(sizeof(SwsContext));
+
     if (!*s)
         return AVERROR(ENOMEM);
     // 赋值操作
     (*s)->srcW = srcW;
-    (*s)->srcH = srcH >> !!i;
+    (*s)->srcH = srcH;
     (*s)->srcFormat = infmt;
     (*s)->dstW = dstW;
-    (*s)->dstH = dstH >> !!i;
+    (*s)->dstH = dstH;
     (*s)->dstFormat = outfmt;
     (*s)->flags = scale->flags;
     (*s)->chrDstHSubSample = (*s)->chrDstVSubSample = (*s)->chrSrcHSubSample = (*s)->chrSrcVSubSample = inframe->subsample;
+
     /* Override YUV420P default settings to have the correct (MPEG-2) chroma positions
     * MPEG-2 chroma positions are used by convention
     * XXX: support other 4:2:0 pixel formats */
@@ -229,7 +224,7 @@ int main(int argc, char* argv[])
     (*s)->dst_h_chr_pos = scale->out_h_chr_pos;
     (*s)->dst_v_chr_pos = out_v_chr_pos;
 
-    if ((ret = sws_init_context(*s, NULL, NULL)) < 0) // 初始化，这里初始化了filter
+    if ((ret = sws_init_context(*s)) < 0) // 初始化，这里初始化了filter
         return ret;
 
     //调用filter_frame来进行实际的缩放操作

@@ -9,32 +9,10 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include "avutil.h"
-// #include "bprint.h"
-#include "common.h"
-// #include "internal.h"
-#include "log.h"
-// #include "thread.h"
 
-// static AVMutex mutex = AV_MUTEX_INITIALIZER;
-/*
- * Copyright (c) 2005-2012 Michael Niedermayer <michaelni@gmx.at>
- *
- * This file is part of FFmpeg.
- *
- * FFmpeg is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * FFmpeg is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
- */
+#include "common.h"
+
+#include "log.h"
 
 /**
  * @file
@@ -48,32 +26,10 @@
 // #include "libavutil/intmath.h"
 #include "common.h"
 #include "avassert.h"
-#include "version.h"
+// #include "version.h"
 
 #define ff_ctzll(v) __builtin_ctzll(v)
 
-/* Stein's binary GCD algorithm:
- * https://en.wikipedia.org/wiki/Binary_GCD_algorithm */
-int64_t av_gcd(int64_t a, int64_t b) {
-    int za, zb, k;
-    int64_t u, v;
-    if (a == 0)
-        return b;
-    if (b == 0)
-        return a;
-    za = ff_ctzll(a);
-    zb = ff_ctzll(b);
-    k  = FFMIN(za, zb);
-    u = llabs(a >> za);
-    v = llabs(b >> zb);
-    while (u != v) {
-        if (u > v)
-            FFSWAP(int64_t, v, u);
-        v -= u;
-        v >>= ff_ctzll(v);
-    }
-    return (uint64_t)u << k;
-}
 
 int64_t av_rescale_rnd(int64_t a, int64_t b, int64_t c, enum AVRounding rnd)
 {
@@ -151,31 +107,6 @@ int64_t av_rescale(int64_t a, int64_t b, int64_t c)
     return av_rescale_rnd(a, b, c, AV_ROUND_NEAR_INF);
 }
 
-int64_t av_rescale_q_rnd(int64_t a, AVRational bq, AVRational cq,
-                         enum AVRounding rnd)
-{
-    int64_t b = bq.num * (int64_t)cq.den;
-    int64_t c = cq.num * (int64_t)bq.den;
-    return av_rescale_rnd(a, b, c, rnd);
-}
-
-int64_t av_rescale_q(int64_t a, AVRational bq, AVRational cq)
-{
-    return av_rescale_q_rnd(a, bq, cq, AV_ROUND_NEAR_INF);
-}
-
-int av_compare_ts(int64_t ts_a, AVRational tb_a, int64_t ts_b, AVRational tb_b)
-{
-    int64_t a = tb_a.num * (int64_t)tb_b.den;
-    int64_t b = tb_b.num * (int64_t)tb_a.den;
-    if ((FFABS(ts_a)|a|FFABS(ts_b)|b) <= INT_MAX)
-        return (ts_a*a > ts_b*b) - (ts_a*a < ts_b*b);
-    if (av_rescale_rnd(ts_a, a, b, AV_ROUND_DOWN) < ts_b)
-        return -1;
-    if (av_rescale_rnd(ts_b, b, a, AV_ROUND_DOWN) < ts_a)
-        return 1;
-    return 0;
-}
 
 int64_t av_compare_mod(uint64_t a, uint64_t b, uint64_t mod)
 {
@@ -185,58 +116,8 @@ int64_t av_compare_mod(uint64_t a, uint64_t b, uint64_t mod)
     return c;
 }
 
-int64_t av_rescale_delta(AVRational in_tb, int64_t in_ts,  AVRational fs_tb, int duration, int64_t *last, AVRational out_tb){
-    int64_t a, b, this;
-
-    av_assert0(in_ts != AV_NOPTS_VALUE);
-    av_assert0(duration >= 0);
-
-    if (*last == AV_NOPTS_VALUE || !duration || in_tb.num*(int64_t)out_tb.den <= out_tb.num*(int64_t)in_tb.den) {
-simple_round:
-        *last = av_rescale_q(in_ts, in_tb, fs_tb) + duration;
-        return av_rescale_q(in_ts, in_tb, out_tb);
-    }
-
-    a =  av_rescale_q_rnd(2*in_ts-1, in_tb, fs_tb, AV_ROUND_DOWN)   >>1;
-    b = (av_rescale_q_rnd(2*in_ts+1, in_tb, fs_tb, AV_ROUND_UP  )+1)>>1;
-    if (*last < 2*a - b || *last > 2*b - a)
-        goto simple_round;
-
-    this = av_clip64(*last, a, b);
-    *last = this + duration;
-
-    return av_rescale_q(this, fs_tb, out_tb);
-}
-
-int64_t av_add_stable(AVRational ts_tb, int64_t ts, AVRational inc_tb, int64_t inc)
-{
-    int64_t m, d;
-
-    if (inc != 1)
-        inc_tb = av_mul_q(inc_tb, (AVRational) {inc, 1});
-
-    m = inc_tb.num * (int64_t)ts_tb.den;
-    d = inc_tb.den * (int64_t)ts_tb.num;
-
-    if (m % d == 0)
-        return ts + m / d;
-    if (m < d)
-        return ts;
-
-    {
-        int64_t old = av_rescale_q(ts, ts_tb, inc_tb);
-        int64_t old_ts = av_rescale_q(old, inc_tb, ts_tb);
-        return av_rescale_q(old + 1, inc_tb, ts_tb) + (ts - old_ts);
-    }
-}
-
 #define LINE_SZ 1024
 
-#if HAVE_VALGRIND_VALGRIND_H
-#include <valgrind/valgrind.h>
-/* this is the log level at which valgrind will output a full backtrace */
-#define BACKTRACE_LOGLEVEL AV_LOG_ERROR
-#endif
 
 static int av_log_level = AV_LOG_INFO;
 // static void (*av_log_callback)(void*, int, const char*, va_list) =

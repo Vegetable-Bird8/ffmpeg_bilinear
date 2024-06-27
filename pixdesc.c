@@ -21,11 +21,10 @@
 
 #include <stdio.h>
 #include <string.h>
-// #include "error.h"
+
 #include "pixfmt.h"
 #include "pixdesc.h"
 
-// #define	ENOSYS		38	/* Invalid system call number */
 
 static const AVPixFmtDescriptor av_pix_fmt_descriptors[] = {
     [AV_PIX_FMT_YUV420P] = {
@@ -78,18 +77,6 @@ static const AVPixFmtDescriptor av_pix_fmt_descriptors[] = {
     }
 };
 
-static enum AVPixelFormat get_pix_fmt_internal(const char *name)
-{
-    int pix_fmt;
-
-    for (pix_fmt = 0; pix_fmt < 4; pix_fmt++)
-        if (av_pix_fmt_descriptors[pix_fmt].name &&
-            (!strcmp(av_pix_fmt_descriptors[pix_fmt].name, name) ||
-             av_match_name(name, av_pix_fmt_descriptors[pix_fmt].alias)))
-            return pix_fmt;
-
-    return -1;
-}
 
 int av_get_bits_per_pixel(const AVPixFmtDescriptor *pixdesc)
 {

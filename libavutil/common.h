@@ -16,7 +16,7 @@
 
 #include "attributes.h"
 #include "macros.h"
-#include "version.h"
+// #include "version.h"
 // #include "avconfig.h"
 
 #if AV_HAVE_BIGENDIAN

@@ -45,7 +45,7 @@
 #include "macros.h"
 #include "mem.h"
 #include "pixfmt.h"
-#include "version.h"
+// #include "version.h"
 
 // #if ARCH_X86
 // #   include "x86/emms.h"
