@@ -21,8 +21,6 @@
 
 #include <stdio.h>
 #include <string.h>
-
-#include "pixfmt.h"
 #include "pixdesc.h"
 
 
@@ -97,17 +95,4 @@ const AVPixFmtDescriptor *av_pix_fmt_desc_get(enum AVPixelFormat pix_fmt)
     if (pix_fmt < 0 || pix_fmt >= AV_PIX_FMT_NB)
         return NULL;
     return &av_pix_fmt_descriptors[pix_fmt];
-}
-
-
-int av_pix_fmt_get_chroma_sub_sample(enum AVPixelFormat pix_fmt,
-                                     int *h_shift, int *v_shift)
-{
-    const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
-    if (!desc)
-        return -1;
-    *h_shift = desc->log2_chroma_w;
-    *v_shift = desc->log2_chroma_h;
-
-    return 0;
 }

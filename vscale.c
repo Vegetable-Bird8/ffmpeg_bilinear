@@ -1,22 +1,3 @@
-/*
- * Copyright (C) 2015 Pedro Arthur <bygrandao@gmail.com>
- *
- * This file is part of FFmpeg.
- *
- * FFmpeg is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * FFmpeg is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
- */
 #include "swscale_internal.h"
 
 typedef struct VScalerContext
@@ -87,27 +68,23 @@ int ff_init_vscale(SwsContext *c, SwsFilterDescriptor *desc, SwsSlice *src, SwsS
     VScalerContext *lumCtx = NULL;
     VScalerContext *chrCtx = NULL;
 
-    if (isPlanarYUV(c->dstFormat)) {
-        lumCtx = av_mallocz(sizeof(VScalerContext));
-        if (!lumCtx)
-            return -12;
+    lumCtx = av_mallocz(sizeof(VScalerContext));
+    if (!lumCtx)
+        return -12;
 
 
-        desc[0].process = lum_planar_vscale;
-        desc[0].instance = lumCtx;
-        desc[0].src = src;
-        desc[0].dst = dst;
+    desc[0].process = lum_planar_vscale;
+    desc[0].instance = lumCtx;
+    desc[0].src = src;
+    desc[0].dst = dst;
 
-        if (!isGray(c->dstFormat)) {
-            chrCtx = av_mallocz(sizeof(VScalerContext));
-            if (!chrCtx)
-                return -12;
-            desc[1].process = chr_planar_vscale;
-            desc[1].instance = chrCtx;
-            desc[1].src = src;
-            desc[1].dst = dst;
-        }
-    }
+    chrCtx = av_mallocz(sizeof(VScalerContext));
+    if (!chrCtx)
+        return -12;  // -12为内存分配失败
+    desc[1].process = chr_planar_vscale;
+    desc[1].instance = chrCtx;
+    desc[1].src = src;
+    desc[1].dst = dst;
 
     ff_init_vscale_pfn(c, c->yuv2plane1, c->yuv2planeX, c->yuv2nv12cX);
     return 0;
@@ -122,31 +99,27 @@ void ff_init_vscale_pfn(SwsContext *c,
     VScalerContext *chrCtx = NULL;
     int idx = c->numDesc - 1;
 
-    if (isPlanarYUV(c->dstFormat) ) {
-        if (!isGray(c->dstFormat)) {
-            chrCtx = c->desc[idx].instance;
+    chrCtx = c->desc[idx].instance;
 
-            chrCtx->filter[0] = c->vChrFilter;
-            chrCtx->filter_size = c->vChrFilterSize;
-            chrCtx->filter_pos = c->vChrFilterPos;
+    chrCtx->filter[0] = c->vChrFilter;
+    chrCtx->filter_size = c->vChrFilterSize;
+    chrCtx->filter_pos = c->vChrFilterPos;
 
-            --idx;
-            if (yuv2nv12cX)               chrCtx->pfn = yuv2nv12cX;
-            else if (c->vChrFilterSize == 1) chrCtx->pfn = yuv2plane1;
-            else                             chrCtx->pfn = yuv2planeX;
-        }
+    --idx;
+    if (yuv2nv12cX)               chrCtx->pfn = yuv2nv12cX;
+    else if (c->vChrFilterSize == 1) chrCtx->pfn = yuv2plane1;
+    else                             chrCtx->pfn = yuv2planeX;
 
-        lumCtx = c->desc[idx].instance;
+    lumCtx = c->desc[idx].instance;
 
-        lumCtx->filter[0] = c->vLumFilter;
-        lumCtx->filter[1] = c->vLumFilter;
-        lumCtx->filter_size = c->vLumFilterSize;
-        lumCtx->filter_pos = c->vLumFilterPos;
+    lumCtx->filter[0] = c->vLumFilter;
+    lumCtx->filter[1] = c->vLumFilter;
+    lumCtx->filter_size = c->vLumFilterSize;
+    lumCtx->filter_pos = c->vLumFilterPos;
 
-        if (c->vLumFilterSize == 1) lumCtx->pfn = yuv2plane1;
-        else                        lumCtx->pfn = yuv2planeX;
+    if (c->vLumFilterSize == 1) lumCtx->pfn = yuv2plane1;
+    else                        lumCtx->pfn = yuv2planeX;
 
-    }
 }
 
 
