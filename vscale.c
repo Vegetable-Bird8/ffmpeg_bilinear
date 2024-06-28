@@ -25,9 +25,7 @@ typedef struct VScalerContext
     int32_t  *filter_pos;
     int filter_size;
     void *pfn;
-    yuv2packedX_fn yuv2packedX;
 } VScalerContext;
-
 
 static int lum_planar_vscale(SwsContext *c, SwsFilterDescriptor *desc, int sliceY, int sliceH)
 {
@@ -89,10 +87,10 @@ int ff_init_vscale(SwsContext *c, SwsFilterDescriptor *desc, SwsSlice *src, SwsS
     VScalerContext *lumCtx = NULL;
     VScalerContext *chrCtx = NULL;
 
-    if (isPlanarYUV(c->dstFormat) /*|| (isGray(c->dstFormat) && !isALPHA(c->dstFormat)) */) {
+    if (isPlanarYUV(c->dstFormat)) {
         lumCtx = av_mallocz(sizeof(VScalerContext));
         if (!lumCtx)
-            return AVERROR(ENOMEM);
+            return -12;
 
 
         desc[0].process = lum_planar_vscale;
@@ -103,7 +101,7 @@ int ff_init_vscale(SwsContext *c, SwsFilterDescriptor *desc, SwsSlice *src, SwsS
         if (!isGray(c->dstFormat)) {
             chrCtx = av_mallocz(sizeof(VScalerContext));
             if (!chrCtx)
-                return AVERROR(ENOMEM);
+                return -12;
             desc[1].process = chr_planar_vscale;
             desc[1].instance = chrCtx;
             desc[1].src = src;
@@ -124,14 +122,13 @@ void ff_init_vscale_pfn(SwsContext *c,
     VScalerContext *chrCtx = NULL;
     int idx = c->numDesc - 1;
 
-    if (isPlanarYUV(c->dstFormat) /*|| (isGray(c->dstFormat) && !isALPHA(c->dstFormat))*/) {
+    if (isPlanarYUV(c->dstFormat) ) {
         if (!isGray(c->dstFormat)) {
             chrCtx = c->desc[idx].instance;
 
             chrCtx->filter[0] = c->vChrFilter;
             chrCtx->filter_size = c->vChrFilterSize;
             chrCtx->filter_pos = c->vChrFilterPos;
-            // chrCtx->isMMX = 0;
 
             --idx;
             if (yuv2nv12cX)               chrCtx->pfn = yuv2nv12cX;
@@ -145,7 +142,6 @@ void ff_init_vscale_pfn(SwsContext *c,
         lumCtx->filter[1] = c->vLumFilter;
         lumCtx->filter_size = c->vLumFilterSize;
         lumCtx->filter_pos = c->vLumFilterPos;
-        // lumCtx->isMMX = 0;
 
         if (c->vLumFilterSize == 1) lumCtx->pfn = yuv2plane1;
         else                        lumCtx->pfn = yuv2planeX;

@@ -26,7 +26,7 @@
 #include "pixdesc.h"
 #include "swscale_internal.h"
 
-static av_always_inline void nvXXtoUV_c(uint8_t *dst1, uint8_t *dst2,
+static inline void nvXXtoUV_c(uint8_t *dst1, uint8_t *dst2,
                                         const uint8_t *src, int width)
 {
     int i;
@@ -38,19 +38,19 @@ static av_always_inline void nvXXtoUV_c(uint8_t *dst1, uint8_t *dst2,
 
 static void nv12ToUV_c(uint8_t *dstU, uint8_t *dstV,
                        const uint8_t *unused0, const uint8_t *src1, const uint8_t *src2,
-                       int width, uint32_t *unused)
+                       int width)
 {
     nvXXtoUV_c(dstU, dstV, src1, width);
 }
 
 static void nv21ToUV_c(uint8_t *dstU, uint8_t *dstV,
                        const uint8_t *unused0, const uint8_t *src1, const uint8_t *src2,
-                       int width, uint32_t *unused)
+                       int width)
 {
     nvXXtoUV_c(dstV, dstU, src1, width);
 }
 
-av_cold void ff_sws_init_input_funcs(SwsContext *c)
+void ff_sws_init_input_funcs(SwsContext *c)
 {
     enum AVPixelFormat srcFormat = c->srcFormat;
 
@@ -63,6 +63,5 @@ av_cold void ff_sws_init_input_funcs(SwsContext *c)
             c->chrToYV12 = nv21ToUV_c;
             break;
     }
-    c->lumToYV12 = NULL;
-    c->alpToYV12 = NULL;
+
 }

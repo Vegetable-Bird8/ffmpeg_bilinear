@@ -1,59 +1,11 @@
-/*
-This is a demo for bilinear from ffmpeg
-ffmpeg try to apply resize in YUV after decode
-There are several steps to go:
-1 Initialize the paramaters,including params pass
-2 Initialize the filter:including following steps:
-    1 calculate the pos matrix
-    2 choose the algorithm for resize
-    3 warp them into a filter
-3 Calculate the dstImage pixel using the pos matrix and algorithm
-*/
-// Input YUV
-#include "config.h"
 #include "limits.h"
-#define _DEFAULT_SOURCE
-#define _SVID_SOURCE // needed for MAP_ANONYMOUS
-#define _DARWIN_C_SOURCE // needed for MAP_ANON
-static size_t max_alloc_size= INT_MAX;
 #include <inttypes.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
-#include "log.h"
-#if HAVE_MMAP
-#include <sys/mman.h>
-#if defined(MAP_ANON) && !defined(MAP_ANONYMOUS)
-#define MAP_ANONYMOUS MAP_ANON
-#endif
-#endif
-#if HAVE_VIRTUALALLOC
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
 
 #include "mem.h"
-#include "swscale.h"
 #include "swscale_internal.h"
-
-
-// We have to implement deprecated functions until they are removed, this is the
-// simplest way to prevent warnings
-#undef attribute_deprecated
-#define attribute_deprecated
-
-
-DECLARE_ALIGNED(8, const uint8_t, ff_dither_8x8_128)[9][8] = {
-    {  36, 68,  60, 92,  34, 66,  58, 90, },
-    { 100,  4, 124, 28,  98,  2, 122, 26, },
-    {  52, 84,  44, 76,  50, 82,  42, 74, },
-    { 116, 20, 108, 12, 114, 18, 106, 10, },
-    {  32, 64,  56, 88,  38, 70,  62, 94, },
-    {  96,  0, 120, 24, 102,  6, 126, 30, },
-    {  48, 80,  40, 72,  54, 86,  46, 78, },
-    { 112, 16, 104,  8, 118, 22, 110, 14, },
-    {  36, 68,  60, 92,  34, 66,  58, 90, },
-};
 
 DECLARE_ALIGNED(8, static const uint8_t, sws_pb_64)[8] = {
     64, 64, 64, 64, 64, 64, 64, 64
@@ -203,9 +155,6 @@ static int initFilter(int16_t **outFilter, int32_t **filterPos,
     }
     *outFilterSize = filterSize;
 
-    if (flags & SWS_PRINT_INFO)
-        printf("SwScaler: reducing / aligning filtersize %d -> %d\n",
-               filter2Size, filterSize);
     /* try to reduce the filter-size (step2 reduce it) */
     for (i = 0; i < dstW; i++) {
         int j;
@@ -328,9 +277,6 @@ static void sws_init_swscale(SwsContext *c)
 
 
     c->hyScale = c->hcScale = hScale8To15_c;
-
-    c->lumConvertRange = NULL;
-    c->chrConvertRange = NULL;
 
     c->needs_hcscale = 1;
 }
@@ -464,12 +410,6 @@ static int swscale(SwsContext *c, const uint8_t *src[],
             lastInChrBuf = firstChrSrcY - 1;
         }
 
-        // printf("dstY: %d\n", dstY);
-        // printf("\tfirstLumSrcY: %d lastLumSrcY: %d lastInLumBuf: %d\n",
-        //               firstLumSrcY, lastLumSrcY, lastInLumBuf);
-        // printf("\tfirstChrSrcY: %d lastChrSrcY: %d lastInChrBuf: %d\n",
-        //               firstChrSrcY, lastChrSrcY, lastInChrBuf);
-
         // Do we have enough lines in this slice to output the dstY line
         enough_lines = lastLumSrcY2 < srcSliceY + srcSliceH &&
                        lastChrSrcY < AV_CEIL_RSHIFT(srcSliceY + srcSliceH, c->chrSrcVSubSample);
@@ -553,58 +493,19 @@ static int swscale(SwsContext *c, const uint8_t *src[],
     return dstY - lastDstY;
 }
 
-int sws_setColorspaceDetails(struct SwsContext *c, const int inv_table[4],
-                             int srcRange, const int table[4], int dstRange,
-                             int brightness, int contrast, int saturation)
-{
-    const AVPixFmtDescriptor *desc_dst;
-    const AVPixFmtDescriptor *desc_src;
-    int need_reinit = 0;
-
-    // handle_formats(c);
-    desc_dst = av_pix_fmt_desc_get(c->dstFormat);
-    desc_src = av_pix_fmt_desc_get(c->srcFormat);
-
-    memmove(c->srcColorspaceTable, inv_table, sizeof(int) * 4);
-    memmove(c->dstColorspaceTable, table, sizeof(int) * 4);
-
-    c->brightness = brightness;
-    c->contrast   = contrast;
-    c->saturation = saturation;
-    c->srcRange   = srcRange;
-    c->dstRange   = dstRange;
-
-    c->dstFormatBpp = av_get_bits_per_pixel(desc_dst);
-    c->srcFormatBpp = av_get_bits_per_pixel(desc_src);
-
-    return -1;
-}
-
 // bilinear 初始化
 int sws_init_context(SwsContext *c)
 {
-    int unscaled;
     int srcW              = c->srcW;
     int srcH              = c->srcH;
     int dstW              = c->dstW;
     int dstH              = c->dstH;
     int dst_stride        = FFALIGN(dstW * sizeof(int16_t) + 66, 16);
     int flags             = 2;
-    enum AVPixelFormat srcFormat = c->srcFormat;
-    enum AVPixelFormat dstFormat = c->dstFormat;
     const AVPixFmtDescriptor *desc_src;
     const AVPixFmtDescriptor *desc_dst;
     int ret = 0;
 
-    unscaled = (srcW == dstW && srcH == dstH);
-    //不做jpeg相关支持，写死
-    c->srcRange = 0;
-    c->dstRange = 0;
-
-    if (!c->contrast && !c->saturation && !c->dstFormatBpp)
-        sws_setColorspaceDetails(c, ff_yuv2rgb_coeffs[SWS_CS_DEFAULT], c->srcRange,
-                                 ff_yuv2rgb_coeffs[SWS_CS_DEFAULT],
-                                 c->dstRange, 0, 1 << 16, 1 << 16);
     // YUV格式描述，后面尝试优化
     desc_src = av_pix_fmt_desc_get(c->srcFormat);
     desc_dst = av_pix_fmt_desc_get(c->dstFormat);
@@ -620,8 +521,8 @@ int sws_init_context(SwsContext *c)
     c->chrDstW = AV_CEIL_RSHIFT(dstW, c->chrDstHSubSample);
     c->chrDstH = AV_CEIL_RSHIFT(dstH, c->chrDstVSubSample);
 
-    // FF_ALLOCZ_OR_GOTO(c, c->formatConvBuffer, FFALIGN(srcW*2+78, 16) * 2, fail);
-    c->formatConvBuffer = av_mallocz(FFALIGN(srcW*2+78, 16) * 2);
+    // // FF_ALLOCZ_OR_GOTO(c, c->formatConvBuffer, FFALIGN(srcW*2+78, 16) * 2, fail);
+    // c->formatConvBuffer = av_mallocz(FFALIGN(srcW*2+78, 16) * 2);
 
     c->srcBpc = desc_src->comp[0].depth;
     if (c->srcBpc < 8)
@@ -654,8 +555,6 @@ int sws_init_context(SwsContext *c)
 
     /* precalculate vertical scaler filter coefficients */
     {
-        const int filterAlign = 2;
-
         if ((ret = initFilter(&c->vLumFilter, &c->vLumFilterPos, &c->vLumFilterSize,
                        c->lumYInc, srcH, dstH, 2, (1 << 12),
                        flags,
@@ -671,12 +570,6 @@ int sws_init_context(SwsContext *c)
 
             return -1;
     }
-
-    for (int i = 0; i < 4; i++)
-        c->dither_error[i] = av_mallocz((c->dstW+2) * sizeof(int));
-
-    c->uv_off   = (dst_stride>>1) + 64 / (c->dstBpc &~ 7);
-    c->uv_offx2 = dst_stride + 16;
 
     if(c->chrDstH > dstH){
         printf("dstH illegal!!\n");

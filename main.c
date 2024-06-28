@@ -11,10 +11,6 @@
 #include "mem.h"
 #include "pixdesc.h"
 
-#include "mathematics.h"
-#include "avassert.h"
-#include "swscale.h"
-
 
 static int readAVFrame(const char *image_yuv, AVFrame *frame) {
 
@@ -41,9 +37,6 @@ static int readAVFrame(const char *image_yuv, AVFrame *frame) {
     frame->data[2] = bs_data + frame->Ysize + frame->UVsize;
 
     fclose(file);
-
-    // // 释放bs_data内存
-    // free(bs_data);
 
     return 0;
 }
@@ -107,9 +100,6 @@ static int initAVFrame(AVFrame *frame, unsigned int width, unsigned int height, 
     frame->width = width;
     frame->height = height;
     frame->format = pixelFormat;
-
-    frame->color_range = 2;  //JPEG
-    frame->colorspace = 2;   //AVCOL_SPC_UNSPECIFIED
     return 0;
 }
 
@@ -172,66 +162,60 @@ int main(int argc, char* argv[])
 
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(infmt);  // 获取format
     struct SwsContext *sws;
-    ScaleContext *scale = (ScaleContext *)malloc(sizeof(ScaleContext));  //分配内存
+    // ScaleContext *scale = (ScaleContext *)malloc(sizeof(ScaleContext));  //分配内存
 
     //初始化scale
-    scale->flags = 2;
+    // scale->flags = 2;
 
-    scale->in_range = 0;
-    scale->out_range = 0;
-    scale->out_h_chr_pos = -513;
-    scale->out_v_chr_pos = -513;
-    scale->in_h_chr_pos  = -513;
-    scale->in_v_chr_pos  = -513;
-    scale->in_color_matrix = "auto";
-    scale->in_range = NULL;
-    sws_freeContext(scale->sws);
 
-    scale->sws = NULL;
+    // scale->out_h_chr_pos = -513;
+    // scale->out_v_chr_pos = -513;
+    // scale->in_h_chr_pos  = -513;
+    // scale->in_v_chr_pos  = -513;
+
+    // sws_freeContext(scale->sws);
+
+    // scale->sws = NULL;
 
     int i = 0;
 
-    int in_v_chr_pos = scale->in_v_chr_pos;
-    int out_v_chr_pos = scale->out_v_chr_pos;
-    struct SwsContext **s = &scale->sws;
-    *s = av_mallocz(sizeof(SwsContext));
+    int in_v_chr_pos = -513;
+    int out_v_chr_pos = -513;
+    struct SwsContext *s = av_mallocz(sizeof(SwsContext));
 
-    if (!*s)
-        return AVERROR(ENOMEM);
+    if (!s)
+        return -12;
     // 赋值操作
-    (*s)->srcW = srcW;
-    (*s)->srcH = srcH;
-    (*s)->srcFormat = infmt;
-    (*s)->dstW = dstW;
-    (*s)->dstH = dstH;
-    (*s)->dstFormat = outfmt;
-    (*s)->flags = scale->flags;
-    (*s)->chrDstHSubSample = (*s)->chrDstVSubSample = (*s)->chrSrcHSubSample = (*s)->chrSrcVSubSample = inframe->subsample;
+    s->srcW = srcW;
+    s->srcH = srcH;
+    s->srcFormat = infmt;
+    s->dstW = dstW;
+    s->dstH = dstH;
+    s->dstFormat = outfmt;
+    s->flags = 2;
+    s->chrDstHSubSample = s->chrDstVSubSample = s->chrSrcHSubSample = s->chrSrcVSubSample = inframe->subsample;
 
     /* Override YUV420P default settings to have the correct (MPEG-2) chroma positions
     * MPEG-2 chroma positions are used by convention
     * XXX: support other 4:2:0 pixel formats */
     if (infmt == AV_PIX_FMT_YUV420P && in_v_chr_pos == -513) {
-        in_v_chr_pos = (i == 0) ? 128 : (i == 1) ? 64 : 192;
+        in_v_chr_pos = 128;
     }
 
     if (outfmt == AV_PIX_FMT_YUV420P && out_v_chr_pos == -513) {
-        out_v_chr_pos = (i == 0) ? 128 : (i == 1) ? 64 : 192;
+        out_v_chr_pos = 128;
     }
 
-    (*s)->src_h_chr_pos = scale->in_h_chr_pos;
-    (*s)->src_v_chr_pos = in_v_chr_pos;
-    (*s)->dst_h_chr_pos = scale->out_h_chr_pos;
-    (*s)->dst_v_chr_pos = out_v_chr_pos;
+    s->src_h_chr_pos = -513;
+    s->src_v_chr_pos = in_v_chr_pos;
+    s->dst_h_chr_pos = -513;
+    s->dst_v_chr_pos = out_v_chr_pos;
 
-    if ((ret = sws_init_context(*s)) < 0) // 初始化，这里初始化了filter
+    if ((ret = sws_init_context(s)) < 0) // 初始化，这里初始化了filter
         return ret;
 
-    //调用filter_frame来进行实际的缩放操作
-    if(ret = filter_frame(scale, inframe, outframe) < 0){
-        fprintf(stderr, "Scale failed! \n");
-        return ret;
-    }
+    int srcSliceY_internal = 0;
+    s->swscale(s, inframe->data, inframe->linesize, srcSliceY_internal, srcH, outframe->data, outframe->linesize); //真正做缩放的地方
 
     if (ret = writeAVFrame(outfilename,outframe) != 0){
         printf("Data dump failed! \n");

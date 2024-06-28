@@ -8,7 +8,7 @@ IGNORED_DIRS = trash
 
 # 获取除了忽略文件夹外的所有源文件
 # SOURCES := $(filter-out $(wildcard $(addsuffix /*.c, $(IGNORED_DIRS))), $(SOURCES))
-SRCS = main.c hscale.c initFilter.c mem.c output.c pixdesc.c  resize.c slice.c vscale.c utils.c input.c# swscale.c #dict.c  opt.c options.c rational.c
+SRCS = main.c hscale.c initFilter.c mem.c output.c pixdesc.c  resize.c slice.c vscale.c input.c# swscale.c #dict.c  opt.c options.c rational.c
 OBJS = $(SRCS:.c=.o)
 
 test_resize: $(OBJS)
@@ -21,4 +21,4 @@ test_resize: $(OBJS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 clean:
-	rm -f $(OBJS) test_resize
+	rm -f $(OBJS) test_resize *.yuv

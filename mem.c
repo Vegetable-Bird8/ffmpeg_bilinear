@@ -26,17 +26,15 @@
 
 #define _XOPEN_SOURCE 600
 
-#include "config.h"
+// #include "config.h"
 
 #include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "avutil.h"
-#include "common.h"
-#include "dynarray.h"
-// #include "intreadwrite.h"
+// #include "avutil.h"
+// #include "common.h"
 #include "mem.h"
 
 
@@ -118,18 +116,5 @@ void *av_mallocz(size_t size)
     void *ptr = av_malloc(size);
     if (ptr)
         memset(ptr, 0, size);
-    return ptr;
-}
-
-
-char *av_strdup(const char *s)
-{
-    char *ptr = NULL;
-    if (s) {
-        size_t len = strlen(s) + 1;
-        ptr = av_realloc(NULL, len);
-        if (ptr)
-            memcpy(ptr, s, len);
-    }
     return ptr;
 }

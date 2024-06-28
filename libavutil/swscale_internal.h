@@ -1,47 +1,20 @@
-/*
- * Copyright (C) 2001-2011 Michael Niedermayer <michaelni@gmx.at>
- *
- * This file is part of FFmpeg.
- *
- * FFmpeg is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 2.1 of the License, or (at your option) any later version.
- *
- * FFmpeg is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
- * Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with FFmpeg; if not, write to the Free Software
- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
- */
-
 #ifndef SWSCALE_SWSCALE_INTERNAL_H
 #define SWSCALE_SWSCALE_INTERNAL_H
-#include "array.c"
-#include "config.h"
-#include "swscale.h"
-#include "avassert.h"
-#include "avutil.h"
-#include "common.h"
+
+
+#include <stddef.h>
+#include <stdint.h>
+
 #include "pixfmt.h"
 #include "pixdesc.h"
-
-#define STR(s) AV_TOSTRING(s) // AV_STRINGIFY is too long
-
-#define YUVRGB_TABLE_HEADROOM 512
-#define YUVRGB_TABLE_LUMA_HEADROOM 512
-// error.h
-#define AVERROR(e) (-(e))   ///< Returns a negative error code from a POSIX error code, to return from library functions.
+#include "array.c"
 
 #define FFMAX(a,b) ((a) > (b) ? (a) : (b))
-#define FFMAX3(a,b,c) FFMAX(FFMAX(a,b),c)
+
 #define FFMIN(a,b) ((a) > (b) ? (b) : (a))
-#define FFMIN3(a,b,c) FFMIN(FFMIN(a,b),c)
 #define ROUNDED_DIV(a,b) (((a)>0 ? (a) + ((b)>>1) : (a) - ((b)>>1))/(b))
 #define FFALIGN(x, a) (((x)+(a)-1)&~((a)-1))
+#define AV_CEIL_RSHIFT(a, b) (((a) + (1 << (b)) - 1) >> (b))
 
 #define MAX_FILTER_SIZE 256
 
@@ -53,7 +26,7 @@
 
 extern const uint8_t ff_log2_tab[256];
 #define av_log2 ff_log2_c
-static av_always_inline av_const int ff_log2_c(unsigned int v)
+static inline const int ff_log2_c(unsigned int v)
 {
     int n = 0;
     if (v & 0xffff0000) {
@@ -68,24 +41,7 @@ static av_always_inline av_const int ff_log2_c(unsigned int v)
 
     return n;
 }
-// #endif
 
-typedef enum SwsDither {
-    SWS_DITHER_NONE = 0,
-    SWS_DITHER_AUTO,
-    SWS_DITHER_BAYER,
-    SWS_DITHER_ED,
-    SWS_DITHER_A_DITHER,
-    SWS_DITHER_X_DITHER,
-    NB_SWS_DITHER,
-} SwsDither;
-
-typedef enum SwsAlphaBlend {
-    SWS_ALPHA_BLEND_NONE  = 0,
-    SWS_ALPHA_BLEND_UNIFORM,
-    SWS_ALPHA_BLEND_CHECKERBOARD,
-    SWS_ALPHA_BLEND_NB,
-} SwsAlphaBlend;
 
 typedef int (*SwsFunc)(struct SwsContext *context, const uint8_t *src[],
                        int srcStride[], int srcSliceY, int srcSliceH,
@@ -145,141 +101,6 @@ typedef void (*yuv2interleavedX_fn)(struct SwsContext *c,
                                     const int16_t **chrVSrc,
                                     uint8_t *dest, int dstW);
 
-/**
- * Write one line of horizontally scaled Y/U/V/A to packed-pixel YUV/RGB
- * output without any additional vertical scaling (or point-scaling). Note
- * that this function may do chroma scaling, see the "uvalpha" argument.
- *
- * @param c       SWS scaling context
- * @param lumSrc  scaled luma (Y) source data, 15 bits for 8-10-bit output,
- *                19 bits for 16-bit output (in int32_t)
- * @param chrUSrc scaled chroma (U) source data, 15 bits for 8-10-bit output,
- *                19 bits for 16-bit output (in int32_t)
- * @param chrVSrc scaled chroma (V) source data, 15 bits for 8-10-bit output,
- *                19 bits for 16-bit output (in int32_t)
- * @param alpSrc  scaled alpha (A) source data, 15 bits for 8-10-bit output,
- *                19 bits for 16-bit output (in int32_t)
- * @param dest    pointer to the output plane. For 16-bit output, this is
- *                uint16_t
- * @param dstW    width of lumSrc and alpSrc in pixels, number of pixels
- *                to write into dest[]
- * @param uvalpha chroma scaling coefficient for the second line of chroma
- *                pixels, either 2048 or 0. If 0, one chroma input is used
- *                for 2 output pixels (or if the SWS_FLAG_FULL_CHR_INT flag
- *                is set, it generates 1 output pixel). If 2048, two chroma
- *                input pixels should be averaged for 2 output pixels (this
- *                only happens if SWS_FLAG_FULL_CHR_INT is not set)
- * @param y       vertical line number for this output. This does not need
- *                to be used to calculate the offset in the destination,
- *                but can be used to generate comfort noise using dithering
- *                for some output formats.
- */
-typedef void (*yuv2packed1_fn)(struct SwsContext *c, const int16_t *lumSrc,
-                               const int16_t *chrUSrc[2],
-                               const int16_t *chrVSrc[2],
-                               const int16_t *alpSrc, uint8_t *dest,
-                               int dstW, int uvalpha, int y);
-/**
- * Write one line of horizontally scaled Y/U/V/A to packed-pixel YUV/RGB
- * output by doing bilinear scaling between two input lines.
- *
- * @param c       SWS scaling context
- * @param lumSrc  scaled luma (Y) source data, 15 bits for 8-10-bit output,
- *                19 bits for 16-bit output (in int32_t)
- * @param chrUSrc scaled chroma (U) source data, 15 bits for 8-10-bit output,
- *                19 bits for 16-bit output (in int32_t)
- * @param chrVSrc scaled chroma (V) source data, 15 bits for 8-10-bit output,
- *                19 bits for 16-bit output (in int32_t)
- * @param alpSrc  scaled alpha (A) source data, 15 bits for 8-10-bit output,
- *                19 bits for 16-bit output (in int32_t)
- * @param dest    pointer to the output plane. For 16-bit output, this is
- *                uint16_t
- * @param dstW    width of lumSrc and alpSrc in pixels, number of pixels
- *                to write into dest[]
- * @param yalpha  luma/alpha scaling coefficients for the second input line.
- *                The first line's coefficients can be calculated by using
- *                4096 - yalpha
- * @param uvalpha chroma scaling coefficient for the second input line. The
- *                first line's coefficients can be calculated by using
- *                4096 - uvalpha
- * @param y       vertical line number for this output. This does not need
- *                to be used to calculate the offset in the destination,
- *                but can be used to generate comfort noise using dithering
- *                for some output formats.
- */
-typedef void (*yuv2packed2_fn)(struct SwsContext *c, const int16_t *lumSrc[2],
-                               const int16_t *chrUSrc[2],
-                               const int16_t *chrVSrc[2],
-                               const int16_t *alpSrc[2],
-                               uint8_t *dest,
-                               int dstW, int yalpha, int uvalpha, int y);
-/**
- * Write one line of horizontally scaled Y/U/V/A to packed-pixel YUV/RGB
- * output by doing multi-point vertical scaling between input pixels.
- *
- * @param c             SWS scaling context
- * @param lumFilter     vertical luma/alpha scaling coefficients, 12 bits [0,4096]
- * @param lumSrc        scaled luma (Y) source data, 15 bits for 8-10-bit output,
- *                      19 bits for 16-bit output (in int32_t)
- * @param lumFilterSize number of vertical luma/alpha input lines to scale
- * @param chrFilter     vertical chroma scaling coefficients, 12 bits [0,4096]
- * @param chrUSrc       scaled chroma (U) source data, 15 bits for 8-10-bit output,
- *                      19 bits for 16-bit output (in int32_t)
- * @param chrVSrc       scaled chroma (V) source data, 15 bits for 8-10-bit output,
- *                      19 bits for 16-bit output (in int32_t)
- * @param chrFilterSize number of vertical chroma input lines to scale
- * @param alpSrc        scaled alpha (A) source data, 15 bits for 8-10-bit output,
- *                      19 bits for 16-bit output (in int32_t)
- * @param dest          pointer to the output plane. For 16-bit output, this is
- *                      uint16_t
- * @param dstW          width of lumSrc and alpSrc in pixels, number of pixels
- *                      to write into dest[]
- * @param y             vertical line number for this output. This does not need
- *                      to be used to calculate the offset in the destination,
- *                      but can be used to generate comfort noise using dithering
- *                      or some output formats.
- */
-typedef void (*yuv2packedX_fn)(struct SwsContext *c, const int16_t *lumFilter,
-                               const int16_t **lumSrc, int lumFilterSize,
-                               const int16_t *chrFilter,
-                               const int16_t **chrUSrc,
-                               const int16_t **chrVSrc, int chrFilterSize,
-                               const int16_t **alpSrc, uint8_t *dest,
-                               int dstW, int y);
-
-/**
- * Write one line of horizontally scaled Y/U/V/A to YUV/RGB
- * output by doing multi-point vertical scaling between input pixels.
- *
- * @param c             SWS scaling context
- * @param lumFilter     vertical luma/alpha scaling coefficients, 12 bits [0,4096]
- * @param lumSrc        scaled luma (Y) source data, 15 bits for 8-10-bit output,
- *                      19 bits for 16-bit output (in int32_t)
- * @param lumFilterSize number of vertical luma/alpha input lines to scale
- * @param chrFilter     vertical chroma scaling coefficients, 12 bits [0,4096]
- * @param chrUSrc       scaled chroma (U) source data, 15 bits for 8-10-bit output,
- *                      19 bits for 16-bit output (in int32_t)
- * @param chrVSrc       scaled chroma (V) source data, 15 bits for 8-10-bit output,
- *                      19 bits for 16-bit output (in int32_t)
- * @param chrFilterSize number of vertical chroma input lines to scale
- * @param alpSrc        scaled alpha (A) source data, 15 bits for 8-10-bit output,
- *                      19 bits for 16-bit output (in int32_t)
- * @param dest          pointer to the output planes. For 16-bit output, this is
- *                      uint16_t
- * @param dstW          width of lumSrc and alpSrc in pixels, number of pixels
- *                      to write into dest[]
- * @param y             vertical line number for this output. This does not need
- *                      to be used to calculate the offset in the destination,
- *                      but can be used to generate comfort noise using dithering
- *                      or some output formats.
- */
-typedef void (*yuv2anyX_fn)(struct SwsContext *c, const int16_t *lumFilter,
-                            const int16_t **lumSrc, int lumFilterSize,
-                            const int16_t *chrFilter,
-                            const int16_t **chrUSrc,
-                            const int16_t **chrVSrc, int chrFilterSize,
-                            const int16_t **alpSrc, uint8_t **dest,
-                            int dstW, int y);
 
 struct SwsSlice;
 struct SwsFilterDescriptor;
@@ -323,11 +144,6 @@ typedef struct SwsContext {
     struct SwsSlice *slice;
     struct SwsFilterDescriptor *desc;
 
-    uint32_t pal_yuv[256];
-    uint32_t pal_rgb[256];
-
-    float uint2float_lut[256];
-
     /**
      * @name Scaled horizontal lines ring buffer.
      * The horizontal scaler keeps just enough scaled lines in a ring buffer
@@ -344,23 +160,6 @@ typedef struct SwsContext {
     int chrBufIndex;              ///< Index in ring buffer of the last scaled horizontal chroma     line from source.
     //@}
 
-    uint8_t *formatConvBuffer;
-    int needAlpha;
-
-    /**
-     * @name Horizontal and vertical filters.
-     * To better understand the following fields, here is a pseudo-code of
-     * their usage in filtering a horizontal line:
-     * @code
-     * for (i = 0; i < width; i++) {
-     *     dst[i] = 0;
-     *     for (j = 0; j < filterSize; j++)
-     *         dst[i] += src[ filterPos[i] + j ] * filter[ filterSize * i + j ];
-     *     dst[i] >>= FRAC_BITS; // The actual implementation is fixed-point.
-     * }
-     * @endcode
-     */
-    //@{
     int16_t *hLumFilter;          ///< Array of horizontal filter coefficients for luma/alpha planes.
     int16_t *hChrFilter;          ///< Array of horizontal filter coefficients for chroma     planes.
     int16_t *vLumFilter;          ///< Array of vertical   filter coefficients for luma/alpha planes.
@@ -373,107 +172,18 @@ typedef struct SwsContext {
     int hChrFilterSize;           ///< Horizontal filter size for chroma     pixels.
     int vLumFilterSize;           ///< Vertical   filter size for luma/alpha pixels.
     int vChrFilterSize;           ///< Vertical   filter size for chroma     pixels.
-    //@}
-
-    int lumMmxextFilterCodeSize;  ///< Runtime-generated MMXEXT horizontal fast bilinear scaler code size for luma/alpha planes.
-    int chrMmxextFilterCodeSize;  ///< Runtime-generated MMXEXT horizontal fast bilinear scaler code size for chroma planes.
-    uint8_t *lumMmxextFilterCode; ///< Runtime-generated MMXEXT horizontal fast bilinear scaler code for luma/alpha planes.
-    uint8_t *chrMmxextFilterCode; ///< Runtime-generated MMXEXT horizontal fast bilinear scaler code for chroma planes.
-
-    int warned_unuseable_bilinear;
 
     int dstY;                     ///< Last destination vertical line output from last slice.
     int flags;                   ///< Flags passed by the user to select scaler algorithm, optimizations, subsampling, etc...
-    // we just need bilinear =2
-    void *yuvTable;             // pointer to the yuv->rgb table start so it can be freed()
 
-    DECLARE_ALIGNED(16, int32_t, input_rgb2yuv_table)[16+40*4]; // This table can contain both C and SIMD formatted values, the C vales are always at the XY_IDX points
-#define RY_IDX 0
-#define GY_IDX 1
-#define BY_IDX 2
-#define RU_IDX 3
-#define GU_IDX 4
-#define BU_IDX 5
-#define RV_IDX 6
-#define GV_IDX 7
-#define BV_IDX 8
-#define RGB2YUV_SHIFT 15
-
-    int *dither_error[4];
-
-    //Colorspace stuff
-    int contrast, brightness, saturation;    // for sws_getColorspaceDetails
-    int srcColorspaceTable[4];
-    int dstColorspaceTable[4];
-    int srcRange;                 ///< 0 = MPG YUV range, 1 = JPG YUV range (source      image).
-    int dstRange;                 ///< 0 = MPG YUV range, 1 = JPG YUV range (destination image).
 
     // 以下四个变量初始值应为 -513
     int src_h_chr_pos;
     int dst_h_chr_pos;
     int src_v_chr_pos;
     int dst_v_chr_pos;
-    int yuv2rgb_y_offset;
-    int yuv2rgb_y_coeff;
-    int yuv2rgb_v2r_coeff;
-    int yuv2rgb_v2g_coeff;
-    int yuv2rgb_u2g_coeff;
-    int yuv2rgb_u2b_coeff;
 
-#define RED_DITHER            "0*8"
-#define GREEN_DITHER          "1*8"
-#define BLUE_DITHER           "2*8"
-#define Y_COEFF               "3*8"
-#define VR_COEFF              "4*8"
-#define UB_COEFF              "5*8"
-#define VG_COEFF              "6*8"
-#define UG_COEFF              "7*8"
-#define Y_OFFSET              "8*8"
-#define U_OFFSET              "9*8"
-#define V_OFFSET              "10*8"
-#define LUM_MMX_FILTER_OFFSET "11*8"
-#define CHR_MMX_FILTER_OFFSET "11*8+4*4*"AV_STRINGIFY(MAX_FILTER_SIZE)
-#define DSTW_OFFSET           "11*8+4*4*"AV_STRINGIFY(MAX_FILTER_SIZE)"*2"
-#define ESP_OFFSET            "11*8+4*4*"AV_STRINGIFY(MAX_FILTER_SIZE)"*2+8"
-#define VROUNDER_OFFSET       "11*8+4*4*"AV_STRINGIFY(MAX_FILTER_SIZE)"*2+16"
-#define U_TEMP                "11*8+4*4*"AV_STRINGIFY(MAX_FILTER_SIZE)"*2+24"
-#define V_TEMP                "11*8+4*4*"AV_STRINGIFY(MAX_FILTER_SIZE)"*2+32"
-#define Y_TEMP                "11*8+4*4*"AV_STRINGIFY(MAX_FILTER_SIZE)"*2+40"
-#define ALP_MMX_FILTER_OFFSET "11*8+4*4*"AV_STRINGIFY(MAX_FILTER_SIZE)"*2+48"
-#define UV_OFF_PX             "11*8+4*4*"AV_STRINGIFY(MAX_FILTER_SIZE)"*3+48"
-#define UV_OFF_BYTE           "11*8+4*4*"AV_STRINGIFY(MAX_FILTER_SIZE)"*3+56"
-#define DITHER16              "11*8+4*4*"AV_STRINGIFY(MAX_FILTER_SIZE)"*3+64"
-#define DITHER32              "11*8+4*4*"AV_STRINGIFY(MAX_FILTER_SIZE)"*3+80"
-#define DITHER32_INT          (11*8+4*4*MAX_FILTER_SIZE*3+80) // value equal to above, used for checking that the struct hasn't been changed by mistake
-
-    DECLARE_ALIGNED(8, uint64_t, redDither);
-    DECLARE_ALIGNED(8, uint64_t, greenDither);
-    DECLARE_ALIGNED(8, uint64_t, blueDither);
-
-    DECLARE_ALIGNED(8, uint64_t, yCoeff);
-    DECLARE_ALIGNED(8, uint64_t, vrCoeff);
-    DECLARE_ALIGNED(8, uint64_t, ubCoeff);
-    DECLARE_ALIGNED(8, uint64_t, vgCoeff);
-    DECLARE_ALIGNED(8, uint64_t, ugCoeff);
-    DECLARE_ALIGNED(8, uint64_t, yOffset);
-    DECLARE_ALIGNED(8, uint64_t, uOffset);
-    DECLARE_ALIGNED(8, uint64_t, vOffset);
-    int32_t lumMmxFilter[4 * MAX_FILTER_SIZE];
-    int32_t chrMmxFilter[4 * MAX_FILTER_SIZE];
     int dstW;                     ///< Width  of destination luma/alpha planes.
-    // DECLARE_ALIGNED(8, uint64_t, esp);
-    // DECLARE_ALIGNED(8, uint64_t, vRounder);
-    // DECLARE_ALIGNED(8, uint64_t, u_temp);
-    // DECLARE_ALIGNED(8, uint64_t, v_temp);
-    // DECLARE_ALIGNED(8, uint64_t, y_temp);
-    int32_t alpMmxFilter[4 * MAX_FILTER_SIZE];
-    // alignment of these values is not necessary, but merely here
-    // to maintain the same offset across x8632 and x86-64. Once we
-    // use proper offset macros in the asm, they can be removed.
-    DECLARE_ALIGNED(8, ptrdiff_t, uv_off); ///< offset (in pixels) between u and v planes
-    DECLARE_ALIGNED(8, ptrdiff_t, uv_offx2); ///< offset (in bytes) between u and v planes
-    DECLARE_ALIGNED(8, uint16_t, dither16)[8];
-    DECLARE_ALIGNED(8, uint32_t, dither32)[8];
 
     const uint8_t *chrDither8, *lumDither8;
 
@@ -482,133 +192,46 @@ typedef struct SwsContext {
     yuv2planarX_fn yuv2planeX;
     yuv2interleavedX_fn yuv2nv12cX;
 
-    /// Unscaled conversion of luma plane to YV12 for horizontal scaler.
-    void (*lumToYV12)(uint8_t *dst, const uint8_t *src, const uint8_t *src2, const uint8_t *src3,
-                      int width, uint32_t *pal);
-    /// Unscaled conversion of alpha plane to YV12 for horizontal scaler.
-    void (*alpToYV12)(uint8_t *dst, const uint8_t *src, const uint8_t *src2, const uint8_t *src3,
-                      int width, uint32_t *pal);
+
     /// Unscaled conversion of chroma planes to YV12 for horizontal scaler.
     void (*chrToYV12)(uint8_t *dstU, uint8_t *dstV,
                       const uint8_t *src1, const uint8_t *src2, const uint8_t *src3,
-                      int width, uint32_t *pal);
+                      int width);
 
-    /**
-     * Functions to read planar input, such as planar RGB, and convert
-     * internally to Y/UV/A.
-     */
-    /** @{ */
-    void (*readLumPlanar)(uint8_t *dst, const uint8_t *src[4], int width, int32_t *rgb2yuv);
-    void (*readChrPlanar)(uint8_t *dstU, uint8_t *dstV, const uint8_t *src[4],
-                          int width, int32_t *rgb2yuv);
-    void (*readAlpPlanar)(uint8_t *dst, const uint8_t *src[4], int width, int32_t *rgb2yuv);
-    /** @} */
-
-    /**
-     * Scale one horizontal line of input data using a bilinear filter
-     * to produce one line of output data. Compared to SwsContext->hScale(),
-     * please take note of the following caveats when using these:
-     * - Scaling is done using only 7 bits instead of 14-bit coefficients.
-     * - You can use no more than 5 input pixels to produce 4 output
-     *   pixels. Therefore, this filter should not be used for downscaling
-     *   by more than ~20% in width (because that equals more than 5/4th
-     *   downscaling and thus more than 5 pixels input per 4 pixels output).
-     * - In general, bilinear filters create artifacts during downscaling
-     *   (even when <20%), because one output pixel will span more than one
-     *   input pixel, and thus some pixels will need edges of both neighbor
-     *   pixels to interpolate the output pixel. Since you can use at most
-     *   two input pixels per output pixel in bilinear scaling, this is
-     *   impossible and thus downscaling by any size will create artifacts.
-     * To enable this type of scaling, set SWS_FLAG_FAST_BILINEAR
-     * in SwsContext->flags.
-     */
-    /** @{ */
-    void (*hyscale_fast)(struct SwsContext *c,
-                         int16_t *dst, int dstWidth,
-                         const uint8_t *src, int srcW, int xInc);
-    void (*hcscale_fast)(struct SwsContext *c,
-                         int16_t *dst1, int16_t *dst2, int dstWidth,
-                         const uint8_t *src1, const uint8_t *src2,
-                         int srcW, int xInc);
-    /** @} */
-
-    /**
-     * Scale one horizontal line of input data using a filter over the input
-     * lines, to produce one (differently sized) line of output data.
-     *
-     * @param dst        pointer to destination buffer for horizontally scaled
-     *                   data. If the number of bits per component of one
-     *                   destination pixel (SwsContext->dstBpc) is <= 10, data
-     *                   will be 15 bpc in 16 bits (int16_t) width. Else (i.e.
-     *                   SwsContext->dstBpc == 16), data will be 19bpc in
-     *                   32 bits (int32_t) width.
-     * @param dstW       width of destination image
-     * @param src        pointer to source data to be scaled. If the number of
-     *                   bits per component of a source pixel (SwsContext->srcBpc)
-     *                   is 8, this is 8bpc in 8 bits (uint8_t) width. Else
-     *                   (i.e. SwsContext->dstBpc > 8), this is native depth
-     *                   in 16 bits (uint16_t) width. In other words, for 9-bit
-     *                   YUV input, this is 9bpc, for 10-bit YUV input, this is
-     *                   10bpc, and for 16-bit RGB or YUV, this is 16bpc.
-     * @param filter     filter coefficients to be used per output pixel for
-     *                   scaling. This contains 14bpp filtering coefficients.
-     *                   Guaranteed to contain dstW * filterSize entries.
-     * @param filterPos  position of the first input pixel to be used for
-     *                   each output pixel during scaling. Guaranteed to
-     *                   contain dstW entries.
-     * @param filterSize the number of input coefficients to be used (and
-     *                   thus the number of input pixels to be used) for
-     *                   creating a single output pixel. Is aligned to 4
-     *                   (and input coefficients thus padded with zeroes)
-     *                   to simplify creating SIMD code.
-     */
-    /** @{ */
     void (*hyScale)(struct SwsContext *c, int16_t *dst, int dstW,
                     const uint8_t *src, const int16_t *filter,
                     const int32_t *filterPos, int filterSize);
     void (*hcScale)(struct SwsContext *c, int16_t *dst, int dstW,
                     const uint8_t *src, const int16_t *filter,
                     const int32_t *filterPos, int filterSize);
-    /** @} */
-
-    /// Color range conversion function for luma plane if needed.
-    void (*lumConvertRange)(int16_t *dst, int width);
-    /// Color range conversion function for chroma planes if needed.
-    void (*chrConvertRange)(int16_t *dst1, int16_t *dst2, int width);
 
     int needs_hcscale; ///< Set if there are chroma planes to be converted.
 
 } SwsContext;
-//FIXME check init (where 0)
-
-SwsFunc ff_yuv2rgb_get_func_ptr(SwsContext *c);
-int ff_yuv2rgb_c_init_tables(SwsContext *c, const int inv_table[4],
-                             int fullRange, int brightness,
-                             int contrast, int saturation);
 
 
-static av_always_inline int is16BPS(enum AVPixelFormat pix_fmt)
+static inline int is16BPS(enum AVPixelFormat pix_fmt)
 {
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
 
     return desc->comp[0].depth == 16;
 }
 
-static av_always_inline int isNBPS(enum AVPixelFormat pix_fmt)
+static inline int isNBPS(enum AVPixelFormat pix_fmt)
 {
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
 
     return desc->comp[0].depth >= 9 && desc->comp[0].depth <= 14;
 }
 
-static av_always_inline int isYUV(enum AVPixelFormat pix_fmt)
+static inline int isYUV(enum AVPixelFormat pix_fmt)
 {
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
 
     return !(desc->flags & AV_PIX_FMT_FLAG_RGB) && desc->nb_components >= 2;
 }
 
-static av_always_inline int isPlanarYUV(enum AVPixelFormat pix_fmt)
+static inline int isPlanarYUV(enum AVPixelFormat pix_fmt)
 {
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
 
@@ -616,35 +239,35 @@ static av_always_inline int isPlanarYUV(enum AVPixelFormat pix_fmt)
 }
 
 
-static av_always_inline int isRGB(enum AVPixelFormat pix_fmt)
+static inline int isRGB(enum AVPixelFormat pix_fmt)
 {
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
 
     return (desc->flags & AV_PIX_FMT_FLAG_RGB);
 }
 // 目前不支持灰度图
-static av_always_inline int isGray(enum AVPixelFormat pix_fmt)
+static inline int isGray(enum AVPixelFormat pix_fmt)
 {
     return 0;
 }
 
 
 
-static av_always_inline int isBayer(enum AVPixelFormat pix_fmt)
+static inline int isBayer(enum AVPixelFormat pix_fmt)
 {
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
 
     return !!(desc->flags & AV_PIX_FMT_FLAG_BAYER);
 }
 
-static av_always_inline int isAnyRGB(enum AVPixelFormat pix_fmt)
+static inline int isAnyRGB(enum AVPixelFormat pix_fmt)
 {
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
 
     return (desc->flags & AV_PIX_FMT_FLAG_RGB);
 }
 
-static av_always_inline int isFloat(enum AVPixelFormat pix_fmt)
+static inline int isFloat(enum AVPixelFormat pix_fmt)
 {
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
 
@@ -652,14 +275,12 @@ static av_always_inline int isFloat(enum AVPixelFormat pix_fmt)
 }
 
 
-static av_always_inline int isPlanar(enum AVPixelFormat pix_fmt)
+static inline int isPlanar(enum AVPixelFormat pix_fmt)
 {
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(pix_fmt);
 
     return (desc->nb_components >= 2 && (desc->flags & AV_PIX_FMT_FLAG_PLANAR));
 }
-
-extern const int32_t ff_yuv2rgb_coeffs[11][4];
 
 // extern const AVClass ff_sws_context_class;
 
@@ -722,8 +343,6 @@ typedef struct SwsFilterDescriptor
 {
     SwsSlice *src;  ///< Source slice
     SwsSlice *dst;  ///< Output slice
-
-    int alpha;      ///< Flag for processing alpha channel
     void *instance; ///< Filter instance data
 
     /// Function for processing input slice sliceH lines starting from line sliceY
@@ -738,8 +357,6 @@ typedef struct AVFrame {
     unsigned int step;
     unsigned int elemSize;
     unsigned int subsample;
-    int color_range;
-    int colorspace;
 
     unsigned int linesize[4];
     int Ysize;
@@ -758,11 +375,6 @@ typedef struct ScaleContext {
     // double param[2];            // sws params
     int hsub, vsub;             ///< chroma subsampling
     int slice_y;                ///< top of current output slice
-    int input_is_pal;           ///< set to 1 if the input format is paletted
-    int output_is_pal;          ///< set to 1 if the output format is paletted
-
-    char *in_color_matrix;
-    char *out_color_matrix;
 
     int in_range;
     int out_range;
@@ -780,9 +392,8 @@ typedef struct ScaleContext {
 
 } ScaleContext;
 
-void sws_freeContext(SwsContext *c);  //释放结构体
 int sws_init_context(SwsContext *c);  //初始化结构体
-int filter_frame(ScaleContext *scale, AVFrame *in, AVFrame *out); // 传递参数的初始化函数
+int filter_frame(SwsContext *c, AVFrame *in, AVFrame *out); // 传递参数的初始化函数
 
 //以上是新加的
 
@@ -804,22 +415,16 @@ int ff_free_filters(SwsContext *c);
 */
 int ff_rotate_slice(SwsSlice *s, int lum, int chr);
 
-/// initializes gamma conversion descriptor
-// int ff_init_gamma_convert(SwsFilterDescriptor *desc, SwsSlice * src, uint16_t *table);
-
-/// initializes lum pixel format conversion descriptor
-int ff_init_desc_fmt_convert(SwsFilterDescriptor *desc, SwsSlice * src, SwsSlice *dst, uint32_t *pal);
 
 /// initializes lum horizontal scaling descriptor
 int ff_init_desc_hscale(SwsFilterDescriptor *desc, SwsSlice *src, SwsSlice *dst, uint16_t *filter, int * filter_pos, int filter_size, int xInc);
 
 /// initializes chr pixel format conversion descriptor
-int ff_init_desc_cfmt_convert(SwsFilterDescriptor *desc, SwsSlice * src, SwsSlice *dst, uint32_t *pal);
+int ff_init_desc_cfmt_convert(SwsFilterDescriptor *desc, SwsSlice * src, SwsSlice *dst);
 
 /// initializes chr horizontal scaling descriptor
 int ff_init_desc_chscale(SwsFilterDescriptor *desc, SwsSlice *src, SwsSlice *dst, uint16_t *filter, int * filter_pos, int filter_size, int xInc);
 
-int ff_init_desc_no_chr(SwsFilterDescriptor *desc, SwsSlice * src, SwsSlice *dst);
 
 /// initializes vertical scaling descriptors
 int ff_init_vscale(SwsContext *c, SwsFilterDescriptor *desc, SwsSlice *src, SwsSlice *dst);
@@ -830,6 +435,52 @@ void ff_init_vscale_pfn(SwsContext *c, yuv2planar1_fn yuv2plane1, yuv2planarX_fn
 
 //number of extra lines to process
 #define MAX_LINES_AHEAD 4
+
+// swscale.h
+
+
+#define SWS_ACCURATE_RND      0x40000
+#define SWS_BITEXACT          0x80000
+
+#define SWS_MAX_REDUCE_CUTOFF 0.002
+#define SWS_CS_DEFAULT        5
+
+/**
+ * Free the swscaler context swsContext.
+ * If swsContext is NULL, then does nothing.
+ */
+void sws_freeContext(struct SwsContext *swsContext);
+
+
+/**
+ * Scale the image slice in srcSlice and put the resulting scaled
+ * slice in the image in dst. A slice is a sequence of consecutive
+ * rows in an image.
+ *
+ * Slices have to be provided in sequential order, either in
+ * top-bottom or bottom-top order. If slices are provided in
+ * non-sequential order the behavior of the function is undefined.
+ *
+ * @param c         the scaling context previously created with
+ *                  sws_getContext()
+ * @param srcSlice  the array containing the pointers to the planes of
+ *                  the source slice
+ * @param srcStride the array containing the strides for each plane of
+ *                  the source image
+ * @param srcSliceY the position in the source image of the slice to
+ *                  process, that is the number (counted starting from
+ *                  zero) in the image of the first row of the slice
+ * @param srcSliceH the height of the source slice, that is the number
+ *                  of rows in the slice
+ * @param dst       the array containing the pointers to the planes of
+ *                  the destination image
+ * @param dstStride the array containing the strides for each plane of
+ *                  the destination image
+ * @return          the height of the output slice
+ */
+int sws_scale(struct SwsContext *c, const uint8_t *const srcSlice[],
+              const int srcStride[], int srcSliceY, int srcSliceH,
+              uint8_t *const dst[], const int dstStride[]);
 
 #endif
 /* SWSCALE_SWSCALE_INTERNAL_H */

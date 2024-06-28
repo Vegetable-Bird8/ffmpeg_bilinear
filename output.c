@@ -23,6 +23,11 @@
 #include <stdio.h>
 #include <string.h>
 #include "swscale_internal.h"
+static inline const uint8_t clip_uint8(int a)
+{
+    if (a&(~0xFF)) return (~a)>>31;
+    else           return a;
+}
 
 static void yuv2planeX_8_c(const int16_t *filter, int filterSize,
                            const int16_t **src, uint8_t *dest, int dstW,
@@ -35,7 +40,7 @@ static void yuv2planeX_8_c(const int16_t *filter, int filterSize,
         for (j=0; j<filterSize; j++)
             val += src[j][i] * filter[j];
 
-        dest[i]= av_clip_uint8(val>>19);
+        dest[i]= clip_uint8(val>>19);
     }
 }
 
@@ -45,7 +50,7 @@ static void yuv2plane1_8_c(const int16_t *src, uint8_t *dest, int dstW,
     int i;
     for (i=0; i<dstW; i++) {
         int val = (src[i] + dither[(i + offset) & 7]) >> 7;
-        dest[i]= av_clip_uint8(val);
+        dest[i]= clip_uint8(val);
     }
 }
 
@@ -67,8 +72,8 @@ static void yuv2nv12cX_c(SwsContext *c, const int16_t *chrFilter, int chrFilterS
                 v += chrVSrc[j][i] * chrFilter[j];
             }
 
-            dest[2*i]= av_clip_uint8(u>>19);
-            dest[2*i+1]= av_clip_uint8(v>>19);
+            dest[2*i]= clip_uint8(u>>19);
+            dest[2*i+1]= clip_uint8(v>>19);
         }
     else
         for (i=0; i<chrDstW; i++) {
@@ -80,12 +85,12 @@ static void yuv2nv12cX_c(SwsContext *c, const int16_t *chrFilter, int chrFilterS
                 v += chrVSrc[j][i] * chrFilter[j];
             }
 
-            dest[2*i]= av_clip_uint8(v>>19);
-            dest[2*i+1]= av_clip_uint8(u>>19);
+            dest[2*i]= clip_uint8(v>>19);
+            dest[2*i+1]= clip_uint8(u>>19);
         }
 }
 
-av_cold void ff_sws_init_output_funcs(SwsContext *c,
+void ff_sws_init_output_funcs(SwsContext *c,
                                       yuv2planar1_fn *yuv2plane1,
                                       yuv2planarX_fn *yuv2planeX,
                                       yuv2interleavedX_fn *yuv2nv12cX)

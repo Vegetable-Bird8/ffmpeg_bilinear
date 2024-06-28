@@ -55,14 +55,14 @@ static int alloc_lines(SwsSlice *s, int size, int width)
         int j;
         int ii = idx[i];
 
-        av_assert0(n == s->plane[ii].available_lines);
+        // av_assert0(n == s->plane[ii].available_lines);
         for (j = 0; j < n; ++j) {
             // chroma plane line U and V are expected to be contiguous in memory
             // by mmx vertical scaler code
             s->plane[i].line[j] = av_malloc(size * 2 + 32);
             if (!s->plane[i].line[j]) {
                 free_lines(s);
-                return AVERROR(ENOMEM);
+                return -12;
             }
             s->plane[ii].line[j] = s->plane[i].line[j] + size + 16;
             if (s->is_ring) {
@@ -93,7 +93,7 @@ static int alloc_slice(SwsSlice *s, enum AVPixelFormat fmt, int lumLines, int ch
         int n = size[i] * ( ring == 0 ? 1 : 3);
         s->plane[i].line = av_mallocz_array(sizeof(uint8_t*), n);
         if (!s->plane[i].line)
-            return AVERROR(ENOMEM);
+            return -12;
 
         s->plane[i].tmp = ring ? s->plane[i].line + size[i] * 2 : NULL;
         s->plane[i].available_lines = size[i];
@@ -253,13 +253,12 @@ int ff_init_filters(SwsContext * c)
     int num_ydesc;
     int num_cdesc;
     int num_vdesc = isPlanarYUV(c->dstFormat) && !isGray(c->dstFormat) ? 2 : 1;
-    int need_lum_conv = c->lumToYV12 || c->readLumPlanar || c->alpToYV12 || c->readAlpPlanar;
-    int need_chr_conv = c->chrToYV12 || c->readChrPlanar;
+
+    int need_chr_conv = c->chrToYV12;
 
     int srcIdx, dstIdx;
     int dst_stride = FFALIGN(c->dstW * sizeof(int16_t) + 66, 16);
 
-    uint32_t * pal = (uint32_t*)c->input_rgb2yuv_table;
     int res = 0;
 
     int lumBufSize;
@@ -272,19 +271,19 @@ int ff_init_filters(SwsContext * c)
     if (c->dstBpc == 16)
         dst_stride <<= 1;
 
-    num_ydesc = need_lum_conv ? 2 : 1;
+    num_ydesc = 1;
     num_cdesc = need_chr_conv ? 2 : 1;
 
     c->numSlice = FFMAX(num_ydesc, num_cdesc) + 2;
-    c->numDesc = num_ydesc + num_cdesc + num_vdesc; //+(need_gamma ? 2 : 0);
-    c->descIndex[0] = num_ydesc; // + (need_gamma ? 1 : 0);
-    c->descIndex[1] = num_ydesc + num_cdesc;// + (need_gamma ? 1 : 0);
+    c->numDesc = num_ydesc + num_cdesc + num_vdesc;
+    c->descIndex[0] = num_ydesc;
+    c->descIndex[1] = num_ydesc + num_cdesc;
 
 
 
     c->desc = av_mallocz_array(sizeof(SwsFilterDescriptor), c->numDesc);
     if (!c->desc)
-        return AVERROR(ENOMEM);
+        return -12;
     c->slice = av_mallocz_array(sizeof(SwsSlice), c->numSlice);
 
     // 分配切片内存
@@ -315,27 +314,10 @@ int ff_init_filters(SwsContext * c)
     srcIdx = 0;
     dstIdx = 1;
 
-    // if (need_gamma) {
-    //     res = ff_init_gamma_convert(c->desc + index, c->slice + srcIdx, c->inv_gamma);
-    //     if (res < 0) goto cleanup;
-    //     ++index;
-    // }
-    //这里是也不需要 随后注释掉
-    // if (need_lum_conv) {
-    //     res = ff_init_desc_fmt_convert(&c->desc[index], &c->slice[srcIdx], &c->slice[dstIdx], pal);
-    //     if (res < 0) goto cleanup;
-    //     c->desc[index].alpha = c->needAlpha;
-    //     ++index;
-    //     srcIdx = dstIdx;
-    // }
-
-
     dstIdx = FFMAX(num_ydesc, num_cdesc);
     res = ff_init_desc_hscale(&c->desc[index], &c->slice[srcIdx], &c->slice[dstIdx], c->hLumFilter, c->hLumFilterPos, c->hLumFilterSize, c->lumXInc);
     // 在这里把 c->desc[index] 指向了c->slice[srcIdx]的地址
     if (res < 0) goto cleanup;
-    // c->desc[index].alpha = c->needAlpha;
-
 
     ++index;
     {
@@ -343,7 +325,7 @@ int ff_init_filters(SwsContext * c)
         dstIdx = 1;
 
         if (need_chr_conv) {   // NV12或者21需要
-            res = ff_init_desc_cfmt_convert(&c->desc[index], &c->slice[srcIdx], &c->slice[dstIdx], pal);
+            res = ff_init_desc_cfmt_convert(&c->desc[index], &c->slice[srcIdx], &c->slice[dstIdx]);
             if (res < 0) goto cleanup;
             ++index;
             srcIdx = dstIdx;
@@ -352,8 +334,7 @@ int ff_init_filters(SwsContext * c)
         dstIdx = FFMAX(num_ydesc, num_cdesc);
         if (c->needs_hcscale)
             res = ff_init_desc_chscale(&c->desc[index], &c->slice[srcIdx], &c->slice[dstIdx], c->hChrFilter, c->hChrFilterPos, c->hChrFilterSize, c->chrXInc);
-        else
-            res = ff_init_desc_no_chr(&c->desc[index], &c->slice[srcIdx], &c->slice[dstIdx]);
+
         if (res < 0) goto cleanup;
     }
 
@@ -366,10 +347,6 @@ int ff_init_filters(SwsContext * c)
     }
 
     ++index;
-    // if (need_gamma) {
-    //     res = ff_init_gamma_convert(c->desc + index, c->slice + dstIdx, c->gamma);
-    //     if (res < 0) goto cleanup;
-    // }
 
     return 0;
 
