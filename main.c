@@ -162,25 +162,9 @@ int main(int argc, char* argv[])
 
     const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(infmt);  // 获取format
     struct SwsContext *sws;
-    // ScaleContext *scale = (ScaleContext *)malloc(sizeof(ScaleContext));  //分配内存
 
-    //初始化scale
-    // scale->flags = 2;
-
-
-    // scale->out_h_chr_pos = -513;
-    // scale->out_v_chr_pos = -513;
-    // scale->in_h_chr_pos  = -513;
-    // scale->in_v_chr_pos  = -513;
-
-    // sws_freeContext(scale->sws);
-
-    // scale->sws = NULL;
-
-    int i = 0;
-
-    int in_v_chr_pos = -513;
-    int out_v_chr_pos = -513;
+    // int in_v_chr_pos = -513;
+    // int out_v_chr_pos = -513;
     struct SwsContext *s = av_mallocz(sizeof(SwsContext));
 
     if (!s)
@@ -198,18 +182,18 @@ int main(int argc, char* argv[])
     /* Override YUV420P default settings to have the correct (MPEG-2) chroma positions
     * MPEG-2 chroma positions are used by convention
     * XXX: support other 4:2:0 pixel formats */
-    if (infmt == AV_PIX_FMT_YUV420P && in_v_chr_pos == -513) {
-        in_v_chr_pos = 128;
-    }
+    // if (infmt == AV_PIX_FMT_YUV420P && in_v_chr_pos == -513) {
+    //     in_v_chr_pos = 128;
+    // }
 
-    if (outfmt == AV_PIX_FMT_YUV420P && out_v_chr_pos == -513) {
-        out_v_chr_pos = 128;
-    }
+    // if (outfmt == AV_PIX_FMT_YUV420P && out_v_chr_pos == -513) {
+    //     out_v_chr_pos = 128;
+    // }
 
-    s->src_h_chr_pos = -513;
-    s->src_v_chr_pos = in_v_chr_pos;
-    s->dst_h_chr_pos = -513;
-    s->dst_v_chr_pos = out_v_chr_pos;
+    // s->src_h_chr_pos = -513;
+    // s->src_v_chr_pos = in_v_chr_pos;
+    // s->dst_h_chr_pos = -513;
+    // s->dst_v_chr_pos = out_v_chr_pos;
 
     if ((ret = sws_init_context(s)) < 0) // 初始化，这里初始化了filter
         return ret;
@@ -224,8 +208,8 @@ int main(int argc, char* argv[])
         printf("Data dump success! \n");
     }
 
-    av_free(inframe);
-    av_free(outframe);
+    free(inframe);
+    free(outframe);
     inframe = NULL;
     outframe = NULL;
 

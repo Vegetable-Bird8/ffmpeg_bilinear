@@ -16,18 +16,18 @@ md5sum_output2=$(md5sum ./tmp_yuv_444_smaller.yuv | awk '{print $1}')
 expected_md5_2="9db6dc94dd41c8d8a4d6701742132785"
 
 # 运行第三个命令
-./test_resize "/home/hsn/middleware/yuv_pic/yuv420/1088test1_420.yuv" 1920 1088 YUV420P 2560 1472 ./tm_yuv_420_bigger.yuv
-md5sum_output3=$(md5sum ./tm_yuv_420_bigger.yuv | awk '{print $1}')
+./test_resize "/home/hsn/middleware/yuv_pic/yuv420/1088test1_420.yuv" 1920 1088 YUV420P 2560 1472 ./tmp_yuv_420_bigger.yuv
+md5sum_output3=$(md5sum ./tmp_yuv_420_bigger.yuv | awk '{print $1}')
 expected_md5_3="634d26ba3314ef517ff1f45e11d9bd99"
 
 # 运行第四个命令
-./test_resize "/home/hsn/middleware/yuv_pic/yuv420/1088test1_420.yuv" 1920 1088 YUV420P 1088 720 ./tm_yuv_420_smaller.yuv
-md5sum_output4=$(md5sum ./tm_yuv_420_smaller.yuv | awk '{print $1}')
+./test_resize "/home/hsn/middleware/yuv_pic/yuv420/1088test1_420.yuv" 1920 1088 YUV420P 1088 720 ./tmp_yuv_420_smaller.yuv
+md5sum_output4=$(md5sum ./tmp_yuv_420_smaller.yuv | awk '{print $1}')
 expected_md5_4="f99b1098136132b345a61f754ed5d254"
 
 # 运行第五个命令 该条和ffmpeg md5值一致
-./test_resize "/home/hsn/middleware/yuv_pic/nv21/JPEG_1920x1088_yuv420_nv21.yuv" 1920 1088 NV21 2560 1472 ./nv21_new.yuv
-md5sum_output5=$(md5sum ./nv21_new.yuv | awk '{print $1}')
+./test_resize "/home/hsn/middleware/yuv_pic/nv21/JPEG_1920x1088_yuv420_nv21.yuv" 1920 1088 NV21 2560 1472 ./tmp_nv21_new.yuv
+md5sum_output5=$(md5sum ./tmp_nv21_new.yuv | awk '{print $1}')
 expected_md5_5="99682d514fa65e7d8fa67a92f8dcb14e"
 
 # 比较实际MD5值和期望的MD5值

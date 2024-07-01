@@ -33,26 +33,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-// #include "avutil.h"
-// #include "common.h"
-#include "mem.h"
-
-
-#define ALIGN (HAVE_AVX512 ? 64 : (HAVE_AVX ? 32 : 16))
-
-/* NOTE: if you want to override these functions with your own
- * implementations (not recommended) you have to link libav* as
- * dynamic libraries and remove -Wl,-Bsymbolic from the linker flags.
- * Note that this will cost performance. */
-
-static size_t max_alloc_size= INT_MAX;
+#include "swscale_internal.h"
 
 void *av_malloc(size_t size)
 {
     void *ptr = NULL;
 
     /* let's disallow possibly ambiguous cases */
-    if (size > (max_alloc_size - 32))
+    if (size > (INT_MAX - 32))
         return NULL;
 
     ptr = malloc(size);
@@ -62,16 +50,6 @@ void *av_malloc(size_t size)
         ptr= av_malloc(1);
     }
     return ptr;
-}
-
-void *av_realloc(void *ptr, size_t size)
-{
-    /* let's disallow possibly ambiguous cases */
-    if (size > (max_alloc_size - 32))
-        return NULL;
-
-    return realloc(ptr, size + !size);
-
 }
 
 void *av_malloc_array(size_t nmemb, size_t size)
@@ -89,26 +67,13 @@ void *av_mallocz_array(size_t nmemb, size_t size)
     return av_mallocz(nmemb * size);
 }
 
-void *av_realloc_array(void *ptr, size_t nmemb, size_t size)
-{
-    if (!size || nmemb >= INT_MAX / size)
-        return NULL;
-    return av_realloc(ptr, nmemb * size);
-}
-
-
-void av_free(void *ptr)
-{
-    free(ptr);
-}
-
 void av_freep(void *arg)
 {
     void *val;
 
     memcpy(&val, arg, sizeof(val));
     memcpy(arg, &(void *){ NULL }, sizeof(val));
-    av_free(val);
+    free(val);
 }
 // 多了一个把内存中的数据全部置0的过程
 void *av_mallocz(size_t size)

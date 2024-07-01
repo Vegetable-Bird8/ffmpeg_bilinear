@@ -1,14 +1,15 @@
 #ifndef SWSCALE_SWSCALE_INTERNAL_H
 #define SWSCALE_SWSCALE_INTERNAL_H
-
-
 #include <stddef.h>
 #include <stdint.h>
+#include "pixdesc.h"    // 像素格式描述，尝试优化
 
-#include "pixdesc.h"
-#include "array.c"
-#include "mem.h"
-
+void *av_malloc(size_t size);
+void *av_mallocz(size_t size);
+void *av_malloc_array(size_t nmemb, size_t size);
+void *av_mallocz_array(size_t nmemb, size_t size);
+void free(void *ptr);
+void av_freep(void *ptr);
 
 #define MAX_FILTER_SIZE 256
 #define RETCODE_USE_CASCADE -12345
@@ -25,46 +26,40 @@
 
 #define FFABS(a) ((a) >= 0 ? (a) : (-(a)))
 
-extern const uint8_t ff_log2_tab[256];
-#define av_log2 ff_log2_c
-static inline const int ff_log2_c(unsigned int v)
+typedef struct FilterContext
 {
-    int n = 0;
-    if (v & 0xffff0000) {
-        v >>= 16;
-        n += 16;
-    }
-    if (v & 0xff00) {
-        v >>= 8;
-        n += 8;
-    }
-    n += ff_log2_tab[v];
+    uint16_t *filter;
+    int *filter_pos;
+    int filter_size;
+    int xInc;
+} FilterContext;
 
-    return n;
-}
+typedef struct VScalerContext
+{
+    uint16_t *filter[2];
+    int32_t  *filter_pos;
+    int filter_size;
+    void *pfn;
+} VScalerContext;
+
 
 typedef int (*SwsFunc)(struct SwsContext *context, const uint8_t *src[],
                        int srcStride[], int srcSliceY, int srcSliceH,
                        uint8_t *dst[], int dstStride[]);
 
 /**
- * Write one line of horizontally scaled data to planar output
- * without any additional vertical scaling (or point-scaling).
+    该函数将水平缩放的数据写入平面输出，同时没有进行额外的垂直缩放
  *
  * @param src     scaled source data, 15 bits for 8-10-bit output,
  *                19 bits for 16-bit output (in int32_t)
  * @param dest    pointer to the output plane. For >8-bit
  *                output, this is in uint16_t
  * @param dstW    width of destination in pixels
- * @param dither  ordered dither array of type int16_t and size 8
- * @param offset  Dither offset
  */
-typedef void (*yuv2planar1_fn)(const int16_t *src, uint8_t *dest, int dstW,
-                               const uint8_t *dither, int offset);
+typedef void (*yuv2planar1_fn)(const int16_t *src, uint8_t *dest, int dstW);
 
 /**
- * Write one line of horizontally scaled data to planar output
- * with multi-point vertical scaling between input pixels.
+该函数将经过水平缩放的数据写入平面输出，并在输入像素之间进行多点垂直缩放
  *
  * @param filter        vertical luma/alpha scaling coefficients, 12 bits [0,4096]
  * @param src           scaled luma (Y) or alpha (A) source data, 15 bits for
@@ -76,12 +71,10 @@ typedef void (*yuv2planar1_fn)(const int16_t *src, uint8_t *dest, int dstW,
  * @param offset        Dither offset
  */
 typedef void (*yuv2planarX_fn)(const int16_t *filter, int filterSize,
-                               const int16_t **src, uint8_t *dest, int dstW,
-                               const uint8_t *dither, int offset);
+                               const int16_t **src, uint8_t *dest, int dstW);
 
 /**
- * Write one line of horizontally scaled chroma to interleaved output
- * with multi-point vertical scaling between input pixels.
+该函数将经过水平缩放的色度数据写入交错输出，并在输入像素之间进行多点垂直缩放。
  *
  * @param c             SWS scaling context
  * @param chrFilter     vertical chroma scaling coefficients, 12 bits [0,4096]
@@ -102,33 +95,30 @@ typedef void (*yuv2interleavedX_fn)(struct SwsContext *c,
                                     uint8_t *dest, int dstW);
 
 
-struct SwsSlice;
-struct SwsFilterDescriptor;
-
 /* This struct should be aligned on at least a 32-byte boundary. */
 typedef struct SwsContext {
 
-    SwsFunc swscale;
-    int srcW;                     ///< Width  of source      luma/alpha planes.
-    int srcH;                     ///< Height of source      luma/alpha planes.
-    int dstH;                     ///< Height of destination luma/alpha planes.
-    int chrSrcW;                  ///< Width  of source      chroma     planes.
-    int chrSrcH;                  ///< Height of source      chroma     planes.
-    int chrDstW;                  ///< Width  of destination chroma     planes.
-    int chrDstH;                  ///< Height of destination chroma     planes.
+    SwsFunc swscale;                // 函数指针，真正做缩放的地方，之后优化
+    int srcW;                     /// 源图像宽度
+    int srcH;                     /// 源图像高度
+    int dstH;                     ///< 目标亮度/透明度平面的高度
+    int chrSrcW;                  ///< 源色度平面的宽度
+    int chrSrcH;                  ///< 源色度平面的高度
+    int chrDstW;                  ///< 目标色度平面的宽度
+    int chrDstH;                  ///< 目标色度平面的高度
     int lumXInc, chrXInc;
     int lumYInc, chrYInc;
-    enum AVPixelFormat dstFormat; ///< Destination pixel format.
-    enum AVPixelFormat srcFormat; ///< Source      pixel format.
-    int dstFormatBpp;             ///< Number of bits per pixel of the destination pixel format.
-    int srcFormatBpp;             ///< Number of bits per pixel of the source      pixel format.
+    enum AVPixelFormat dstFormat; ///< 目标像素格式
+    enum AVPixelFormat srcFormat; ///< 源像素格式
+    int dstFormatBpp;             ///< 目标像素格式的每像素位数
+    int srcFormatBpp;             ///< 源像素格式的每像素位数
     int dstBpc, srcBpc;
-    int chrSrcHSubSample;         ///< Binary logarithm of horizontal subsampling factor between luma/alpha and chroma planes in source      image.
-    int chrSrcVSubSample;         ///< Binary logarithm of vertical   subsampling factor between luma/alpha and chroma planes in source      image.
-    int chrDstHSubSample;         ///< Binary logarithm of horizontal subsampling factor between luma/alpha and chroma planes in destination image.
-    int chrDstVSubSample;         ///< Binary logarithm of vertical   subsampling factor between luma/alpha and chroma planes in destination image.
-    int vChrDrop;                 ///< Binary logarithm of extra vertical subsampling factor in source image chroma planes specified by user.
-    int sliceDir;                 ///< Direction that slices are fed to the scaler (1 = top-to-bottom, -1 = bottom-to-top).
+    int chrSrcHSubSample;         ///< 源图像亮度/透明度与色度平面之间水平下采样因子的二进制对数
+    int chrSrcVSubSample;         ///< 源图像亮度/透明度与色度平面之间垂直下采样因子的二进制对数
+    int chrDstHSubSample;         ///< 目标图像亮度/透明度与色度平面之间水平下采样因子的二进制对数
+    int chrDstVSubSample;         ///< 目标图像亮度/透明度与色度平面之间垂直下采样因子的二进制对数
+    int vChrDrop;                 ///< 用户指定的源图像色度平面额外垂直下采样因子的二进制对数
+    int sliceDir;                 ///< 切片被馈送到缩放器的方向（1 = 自上而下，-1 = 自下而上）
 
     int numDesc;
     int descIndex[2];
@@ -137,55 +127,42 @@ typedef struct SwsContext {
     struct SwsFilterDescriptor *desc;
 
     /**
-     * @name Scaled horizontal lines ring buffer.
-     * The horizontal scaler keeps just enough scaled lines in a ring buffer
-     * so they may be passed to the vertical scaler. The pointers to the
-     * allocated buffers for each line are duplicated in sequence in the ring
-     * buffer to simplify indexing and avoid wrapping around between lines
-     * inside the vertical scaler code. The wrapping is done before the
-     * vertical scaler is called.
+     * @name 水平线缓冲区
+     * 水平缩放器保留足够的缩放行在环形缓冲区中，以便它们可以传递给垂直缩放器。
+     * 每行的分配缓冲区指针在环形缓冲区中依次复制，以简化索引并避免在垂直缩放器代码内部的行之间环绕。
+     * 在调用垂直缩放器之前进行包装。
      */
     //@{
-    int lastInLumBuf;             ///< Last scaled horizontal luma/alpha line from source in the ring buffer.
-    int lastInChrBuf;             ///< Last scaled horizontal chroma     line from source in the ring buffer.
-    int lumBufIndex;              ///< Index in ring buffer of the last scaled horizontal luma/alpha line from source.
-    int chrBufIndex;              ///< Index in ring buffer of the last scaled horizontal chroma     line from source.
+    int lastInLumBuf;             ///< 源图像最后一个缩放的水平亮度/透明度行在环形缓冲区中
+    int lastInChrBuf;             ///< 源图像最后一个缩放的水平色度行在环形缓冲区中
+    int lumBufIndex;              ///< 最后一个缩放的水平亮度/透明度行在环形缓冲区中的索引
+    int chrBufIndex;              ///< 最后一个缩放的水平色度行在环形缓冲区中的索引
     //@}
 
-    int16_t *hLumFilter;          ///< Array of horizontal filter coefficients for luma/alpha planes.
-    int16_t *hChrFilter;          ///< Array of horizontal filter coefficients for chroma     planes.
-    int16_t *vLumFilter;          ///< Array of vertical   filter coefficients for luma/alpha planes.
-    int16_t *vChrFilter;          ///< Array of vertical   filter coefficients for chroma     planes.
-    int32_t *hLumFilterPos;       ///< Array of horizontal filter starting positions for each dst[i] for luma/alpha planes.
-    int32_t *hChrFilterPos;       ///< Array of horizontal filter starting positions for each dst[i] for chroma     planes.
-    int32_t *vLumFilterPos;       ///< Array of vertical   filter starting positions for each dst[i] for luma/alpha planes.
-    int32_t *vChrFilterPos;       ///< Array of vertical   filter starting positions for each dst[i] for chroma     planes.
-    int hLumFilterSize;           ///< Horizontal filter size for luma/alpha pixels.
-    int hChrFilterSize;           ///< Horizontal filter size for chroma     pixels.
-    int vLumFilterSize;           ///< Vertical   filter size for luma/alpha pixels.
-    int vChrFilterSize;           ///< Vertical   filter size for chroma     pixels.
+    int16_t *hLumFilter;          ///< 亮度/透明度平面的水平滤波系数数组
+    int16_t *hChrFilter;          ///< 色度平面的水平滤波系数数组
+    int16_t *vLumFilter;          ///< 亮度/透明度平面的垂直滤波系数数组
+    int16_t *vChrFilter;          ///< 色度平面的垂直滤波系数数组
+    int32_t *hLumFilterPos;       ///< 每个dst[i]的亮度/透明度平面的水平滤波起始位置数组
+    int32_t *hChrFilterPos;       ///< 每个dst[i]的色度平面的水平滤波起始位置数组
+    int32_t *vLumFilterPos;       ///< 每个dst[i]的亮度/透明度平面的垂直滤波起始位置数组
+    int32_t *vChrFilterPos;       ///< 每个dst[i]的色度平面的垂直滤波起始位置数组
+    int hLumFilterSize;           ///< 亮度/透明度像素的水平滤波大小
+    int hChrFilterSize;           ///< 色度像素的水平滤波大小
+    int vLumFilterSize;           ///< 亮度/透明度像素的垂直滤波大小
+    int vChrFilterSize;           ///< 色度像素的垂直滤波大小
+    int dstW;                     ///< 目标亮度/透明度平面的宽度
+    int dstY;                     ///< 最后一个从最后一个切片输出的目标垂直线
+    int flags;                   ///< 用户传递的标志，选择缩放器算法、优化、子采样等...
 
-    int dstY;                     ///< Last destination vertical line output from last slice.
-    int flags;                   ///< Flags passed by the user to select scaler algorithm, optimizations, subsampling, etc...
 
 
-    // 以下四个变量初始值应为 -513
-    int src_h_chr_pos;
-    int dst_h_chr_pos;
-    int src_v_chr_pos;
-    int dst_v_chr_pos;
-
-    int dstW;                     ///< Width  of destination luma/alpha planes.
-
-    const uint8_t *chrDither8, *lumDither8;
-
-    /* function pointers for swscale() */
+    /* swscale()的函数指针 */
     yuv2planar1_fn yuv2plane1;
     yuv2planarX_fn yuv2planeX;
     yuv2interleavedX_fn yuv2nv12cX;
 
-
-    /// Unscaled conversion of chroma planes to YV12 for horizontal scaler.
+    /// 未缩放的色度平面转换为YV12用于水平缩放器。
     void (*chrToYV12)(uint8_t *dstU, uint8_t *dstV,
                       const uint8_t *src1, const uint8_t *src2, const uint8_t *src3,
                       int width);
@@ -197,16 +174,9 @@ typedef struct SwsContext {
                     const uint8_t *src, const int16_t *filter,
                     const int32_t *filterPos, int filterSize);
 
-    int needs_hcscale; ///< Set if there are chroma planes to be converted.
+    int needs_hcscale; ///< 如果有需要转换的色度平面，则设置
 
 } SwsContext;
-
-
-void ff_sws_init_input_funcs(SwsContext *c);
-void ff_sws_init_output_funcs(SwsContext *c,
-                              yuv2planar1_fn *yuv2plane1,
-                              yuv2planarX_fn *yuv2planeX,
-                              yuv2interleavedX_fn *yuv2nv12cX);
 
 typedef struct SwsPlane
 {
@@ -264,74 +234,62 @@ typedef struct AVFrame {
 
 int sws_init_context(SwsContext *c);  //初始化结构体
 
-//以上是新加的
 
-// warp input lines in the form (src + width*i + j) to slice format (line[i][j])
-// relative=true means first line src[x][0] otherwise first line is src[x][lum/crh Y]
+// 将形式为 (src + width*i + j) 的输入行转换为切片格式 (line[i][j])
+// relative=true 表示第一行是 src[x][0]，否则第一行是 src[x][lum/crh Y]
 int ff_init_slice_from_src(SwsSlice * s, uint8_t *src[4], int stride[4], int srcW, int lumY, int lumH, int chrY, int chrH, int relative);
 
-// Initialize scaler filter descriptor chain
+// 初始化缩放器滤波器描述符链
 int ff_init_filters(SwsContext *c);
 
-// Free all filter data
+// 释放所有滤波器数据
 int ff_free_filters(SwsContext *c);
 
 /*
- function for applying ring buffer logic into slice s
- It checks if the slice can hold more @lum lines, if yes
- do nothing otherwise remove @lum least used lines.
- It applies the same procedure for @chr lines.
+ 将环形缓冲逻辑应用于切片 s 的函数
+ 检查切片是否可以容纳更多 @lum 行，如果可以则不执行任何操作，否则移除 @lum 最不常用的行。
+ 对 @chr 行应用相同的过程。
 */
 int ff_rotate_slice(SwsSlice *s, int lum, int chr);
 
 
-/// initializes lum horizontal scaling descriptor
-int ff_init_desc_hscale(SwsFilterDescriptor *desc, SwsSlice *src, SwsSlice *dst, uint16_t *filter, int * filter_pos, int filter_size, int xInc);
+/// 初始化亮度水平缩放描述符
+int ff_init_desc_hscale(SwsFilterDescriptor *desc, SwsSlice *src, SwsSlice *dst, uint16_t *filter, int *filter_pos, int filter_size, int xInc);
 
-/// initializes chr pixel format conversion descriptor
-int ff_init_desc_cfmt_convert(SwsFilterDescriptor *desc, SwsSlice * src, SwsSlice *dst);
+/// 初始化色度像素格式转换描述符
+int ff_init_desc_cfmt_convert(SwsFilterDescriptor *desc, SwsSlice *src, SwsSlice *dst);
 
-/// initializes chr horizontal scaling descriptor
-int ff_init_desc_chscale(SwsFilterDescriptor *desc, SwsSlice *src, SwsSlice *dst, uint16_t *filter, int * filter_pos, int filter_size, int xInc);
+/// 初始化色度水平缩放描述符
+int ff_init_desc_chscale(SwsFilterDescriptor *desc, SwsSlice *src, SwsSlice *dst, uint16_t *filter, int *filter_pos, int filter_size, int xInc);
 
 
-/// initializes vertical scaling descriptors
+/// 初始化垂直缩放描述符
 int ff_init_vscale(SwsContext *c, SwsFilterDescriptor *desc, SwsSlice *src, SwsSlice *dst);
 
-/// setup vertical scaler functions
+/// 设置垂直缩放器函数
 void ff_init_vscale_pfn(SwsContext *c, yuv2planar1_fn yuv2plane1, yuv2planarX_fn yuv2planeX,
     yuv2interleavedX_fn yuv2nv12cX);
 
 
 /**
- * Scale the image slice in srcSlice and put the resulting scaled
- * slice in the image in dst. A slice is a sequence of consecutive
- * rows in an image.
+ * 对 srcSlice 中的图像切片进行缩放，并将结果放入 dst 中的图像切片。
+ * 切片是图像中连续行的序列。
  *
- * Slices have to be provided in sequential order, either in
- * top-bottom or bottom-top order. If slices are provided in
- * non-sequential order the behavior of the function is undefined.
+ * 必须按顺序提供切片，可以是自顶向下或自底向上的顺序。如果以非顺序方式提供切片，则函数的行为是未定义的。
  *
- * @param c         the scaling context previously created with
- *                  sws_getContext()
- * @param srcSlice  the array containing the pointers to the planes of
- *                  the source slice
- * @param srcStride the array containing the strides for each plane of
- *                  the source image
- * @param srcSliceY the position in the source image of the slice to
- *                  process, that is the number (counted starting from
- *                  zero) in the image of the first row of the slice
- * @param srcSliceH the height of the source slice, that is the number
- *                  of rows in the slice
- * @param dst       the array containing the pointers to the planes of
- *                  the destination image
- * @param dstStride the array containing the strides for each plane of
- *                  the destination image
- * @return          the height of the output slice
+ * @param c         先前使用 sws_getContext() 创建的缩放上下文
+ * @param srcSlice  包含源切片各平面指针的数组
+ * @param srcStride 包含源图像各平面跨距的数组
+ * @param srcSliceY 要处理的源图像切片的位置，即切片的第一行在图像中的位置（从零开始计数）
+ * @param srcSliceH 源切片的高度，即切片中的行数
+ * @param dst       包含目标图像各平面指针的数组
+ * @param dstStride 包含目标图像各平面跨距的数组
+ * @return          输出切片的高度
  */
 int sws_scale(struct SwsContext *c, const uint8_t *const srcSlice[],
               const int srcStride[], int srcSliceY, int srcSliceH,
               uint8_t *const dst[], const int dstStride[]);
+
 
 #endif
 /* SWSCALE_SWSCALE_INTERNAL_H */
