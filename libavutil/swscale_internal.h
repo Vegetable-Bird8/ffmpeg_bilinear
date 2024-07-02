@@ -4,11 +4,8 @@
 #include <stdint.h>
 #include "pixdesc.h"    // 像素格式描述，尝试优化
 
-void *av_malloc(size_t size);
 void *av_mallocz(size_t size);
-void *av_malloc_array(size_t nmemb, size_t size);
 void *av_mallocz_array(size_t nmemb, size_t size);
-void free(void *ptr);
 void av_freep(void *ptr);
 
 #define MAX_FILTER_SIZE 256
@@ -180,24 +177,25 @@ typedef struct SwsContext {
 
 typedef struct SwsPlane
 {
-    int available_lines;    ///< max number of lines that can be hold by this plane
-    int sliceY;             ///< index of first line
-    int sliceH;             ///< number of lines
-    uint8_t **line;         ///< line buffer
-    uint8_t **tmp;          ///< Tmp line buffer used by mmx code
+    int available_lines;    ///< 该平面可以容纳的最大行数
+    int sliceY;             ///< 起始行数
+    int sliceH;             ///< 总行数
+    uint8_t **line;         ///< 行buffer
 } SwsPlane;
 
 /**
  * Struct which defines a slice of an image to be scaled or an output for
  * a scaled slice.
  * A slice can also be used as intermediate ring buffer for scaling steps.
+ * 定义了一个图像的切片，用来缩放，或者用来接收输出的缩放后的切片
+ * 切片同样能被用做中间环形缓冲区来缩放
  */
 typedef struct SwsSlice
 {
-    int width;              ///< Slice line width
+    int width;              ///< 切片行的宽度（像素个数）
     int h_chr_sub_sample;   ///< horizontal chroma subsampling factor
     int v_chr_sub_sample;   ///< vertical chroma subsampling factor
-    int is_ring;            ///< flag to identify if this slice is a ring buffer
+    int is_ring;            ///< 是否使用环形缓冲区
     int should_free_lines;  ///< flag to identify if there are dynamic allocated lines
     enum AVPixelFormat fmt; ///< planes pixel format
     SwsPlane plane[4];   ///< color planes

@@ -35,30 +35,6 @@
 
 #include "swscale_internal.h"
 
-void *av_malloc(size_t size)
-{
-    void *ptr = NULL;
-
-    /* let's disallow possibly ambiguous cases */
-    if (size > (INT_MAX - 32))
-        return NULL;
-
-    ptr = malloc(size);
-
-    if(!ptr && !size) {
-        size = 1;
-        ptr= av_malloc(1);
-    }
-    return ptr;
-}
-
-void *av_malloc_array(size_t nmemb, size_t size)
-{
-    if (!size || nmemb >= INT_MAX / size)
-        return NULL;
-    return av_malloc(nmemb * size);
-}
-
 
 void *av_mallocz_array(size_t nmemb, size_t size)
 {
@@ -78,7 +54,7 @@ void av_freep(void *arg)
 // 多了一个把内存中的数据全部置0的过程
 void *av_mallocz(size_t size)
 {
-    void *ptr = av_malloc(size);
+    void *ptr = malloc(size);
     if (ptr)
         memset(ptr, 0, size);
     return ptr;

@@ -29,7 +29,7 @@ static int lum_h_scale(SwsContext *c, SwsFilterDescriptor *desc, int sliceY, int
 
 int ff_init_desc_hscale(SwsFilterDescriptor *desc, SwsSlice *src, SwsSlice *dst, uint16_t *filter, int * filter_pos, int filter_size, int xInc)
 {
-    FilterContext *li = av_malloc(sizeof(FilterContext));
+    FilterContext *li = malloc(sizeof(FilterContext));
     if (!li)
         return -12;
 
@@ -118,7 +118,7 @@ int ff_init_desc_cfmt_convert(SwsFilterDescriptor *desc, SwsSlice * src, SwsSlic
 
 int ff_init_desc_chscale(SwsFilterDescriptor *desc, SwsSlice *src, SwsSlice *dst, uint16_t *filter, int * filter_pos, int filter_size, int xInc)
 {
-    FilterContext *li = av_malloc(sizeof(FilterContext));
+    FilterContext *li = malloc(sizeof(FilterContext));
     if (!li)
         return -12;
 
@@ -287,7 +287,7 @@ static int alloc_lines(SwsSlice *s, int size, int width)
 
         for (int j = 0; j < n; ++j) {
             // 为色度平面分配内存，确保U和V在内存中是连续存储的
-            s->plane[i].line[j] = av_malloc(size * 2 + 32); // 分配内存
+            s->plane[i].line[j] = malloc(size * 2 + 32); // 分配内存
             if (!s->plane[i].line[j]) {
                 free_lines(s); // 释放内存
                 return -12; // 内存分配失败
@@ -321,7 +321,7 @@ static int alloc_slice(SwsSlice *s, enum AVPixelFormat fmt, int lumLines, int ch
         if (!s->plane[i].line)
             return -12; // 内存分配失败
 
-        s->plane[i].tmp = ring ? s->plane[i].line + size[i] * 2 : NULL; // 如果是环形缓冲，设置临时指针
+        // s->plane[i].tmp = ring ? s->plane[i].line + size[i] * 2 : NULL; // 如果是环形缓冲，设置临时指针
         s->plane[i].available_lines = size[i]; // 可用行数
         s->plane[i].sliceY = 0; // 切片的起始行
         s->plane[i].sliceH = 0; // 切片的高度
@@ -338,7 +338,7 @@ static void free_slice(SwsSlice *s)
             free_lines(s);
         for (i = 0; i < 4; ++i) {
             av_freep(&s->plane[i].line);
-            s->plane[i].tmp = NULL;
+            // s->plane[i].tmp = NULL;
         }
     }
 }

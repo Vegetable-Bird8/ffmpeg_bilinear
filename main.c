@@ -8,7 +8,6 @@
 #include <math.h>
 #include <string.h>
 #include "swscale_internal.h"
-#include "mem.h"
 #include "pixdesc.h"
 
 

@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "mem.h"
 #include "swscale_internal.h"
 
 static inline void nvXXtoUV_c(uint8_t *dst1, uint8_t *dst2,
@@ -129,7 +128,7 @@ static int initFilter(int16_t **outFilter, int32_t **filterPos,
     int ret = -1;
 
     // 分配内存
-    *filterPos = av_malloc_array((dstW + 3), sizeof(**filterPos));
+    *filterPos = malloc((dstW + 3)*sizeof(**filterPos));
 
     int64_t xDstInSrc;
     int sizeFactor = 2; // 双线性插值的 sizeFactor=2
@@ -142,7 +141,7 @@ static int initFilter(int16_t **outFilter, int32_t **filterPos,
     filterSize = FFMIN(filterSize, srcW - 2);
     filterSize = FFMAX(filterSize, 1);
 
-    filter = av_malloc_array(dstW, sizeof(*filter) * filterSize);
+    filter = malloc(dstW * sizeof(*filter) * filterSize);
 
     xDstInSrc = ((128 *(int64_t)xInc)>>7) - ((128 *0x10000LL)>>7); // 统一扩大系数，防止小数计算
     for (i = 0; i < dstW; i++) {
@@ -172,7 +171,7 @@ static int initFilter(int16_t **outFilter, int32_t **filterPos,
     filter2Size = filterSize;
 
     // 分配内存
-    filter2 = av_malloc_array(dstW, sizeof(*filter2) * filter2Size);
+    filter2 = malloc(dstW * sizeof(*filter2) * filter2Size);
     for (i = 0; i < dstW; i++) {
         for (int j = 0; j < filterSize; j++)
             filter2[i * filter2Size + j] = filter[i * filterSize + j];
@@ -225,7 +224,7 @@ static int initFilter(int16_t **outFilter, int32_t **filterPos,
     filterSize = (minFilterSize + (filterAlign - 1)) & (~(filterAlign - 1));
 
     // 分配内存
-    filter = av_malloc_array(dstW, filterSize * sizeof(*filter));
+    filter = malloc(dstW * filterSize * sizeof(*filter));
     if (!filter)
         goto fail;
 
@@ -279,7 +278,7 @@ static int initFilter(int16_t **outFilter, int32_t **filterPos,
     }
 
     // 分配内存
-    *outFilter = av_malloc_array(dstW + 3, *outFilterSize * sizeof(int16_t));
+    *outFilter = malloc((dstW + 3) * (*outFilterSize * sizeof(int16_t)));
     // 归一化并存储到 outFilter 中
     for (i = 0; i < dstW; i++) {
         int j;
