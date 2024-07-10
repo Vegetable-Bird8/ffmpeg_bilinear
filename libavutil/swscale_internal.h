@@ -95,31 +95,31 @@ typedef void (*yuv2interleavedX_fn)(struct SwsContext *c,
 /* This struct should be aligned on at least a 32-byte boundary. */
 typedef struct SwsContext {
 
-    SwsFunc swscale;                // 函数指针，真正做缩放的地方，之后优化
+    SwsFunc swscale;                // 函数指针，真正做缩放的地方
     int srcW;                     /// 源图像宽度
     int srcH;                     /// 源图像高度
-    int dstH;                     ///< 目标亮度/透明度平面的高度
+    int dstH;                     ///< 目标亮度平面的高度
     int chrSrcW;                  ///< 源色度平面的宽度
     int chrSrcH;                  ///< 源色度平面的高度
     int chrDstW;                  ///< 目标色度平面的宽度
     int chrDstH;                  ///< 目标色度平面的高度
-    int lumXInc, chrXInc;
-    int lumYInc, chrYInc;
+    int lumXInc, chrXInc;           //亮度和色度的水平缩放系数
+    int lumYInc, chrYInc;           //亮度和色度的垂直缩放系数
     enum AVPixelFormat dstFormat; ///< 目标像素格式
     enum AVPixelFormat srcFormat; ///< 源像素格式
     int dstFormatBpp;             ///< 目标像素格式的每像素位数
     int srcFormatBpp;             ///< 源像素格式的每像素位数
-    int dstBpc, srcBpc;
-    int chrSrcHSubSample;         ///< 源图像亮度/透明度与色度平面之间水平下采样因子的二进制对数
-    int chrSrcVSubSample;         ///< 源图像亮度/透明度与色度平面之间垂直下采样因子的二进制对数
-    int chrDstHSubSample;         ///< 目标图像亮度/透明度与色度平面之间水平下采样因子的二进制对数
-    int chrDstVSubSample;         ///< 目标图像亮度/透明度与色度平面之间垂直下采样因子的二进制对数
-    int vChrDrop;                 ///< 用户指定的源图像色度平面额外垂直下采样因子的二进制对数
+    int dstBpc, srcBpc;             //通道位深，目前四种格式都是8
+    int chrSrcHSubSample;         ///< 源图像亮度与色度平面之间水平下采样因子的二进制对数
+    int chrSrcVSubSample;         ///< 源图像亮度与色度平面之间垂直下采样因子的二进制对数
+    int chrDstHSubSample;         ///< 目标图像亮度与色度平面之间水平下采样因子的二进制对数
+    int chrDstVSubSample;         ///< 目标图像亮度与色度平面之间垂直下采样因子的二进制对数
+    int vChrDrop;                 ///< 用户指定的源图像色度平面额外垂直下采样因子的二进制对数，一般为0
     int sliceDir;                 ///< 切片被馈送到缩放器的方向（1 = 自上而下，-1 = 自下而上）
 
-    int numDesc;
-    int descIndex[2];
-    int numSlice;
+    int numDesc;                  //滤波器描述器额个数，存储了图像宽高数据以及缩放用到的函数等
+    int descIndex[2];             //0存放的是亮度结束的索引，也是色度平面开始得到索引 1记录的是色度平面结束的索引
+    int numSlice;                 //切片的个数，由水平和垂直滤波器的个数决定
     struct SwsSlice *slice;
     struct SwsFilterDescriptor *desc;
 
@@ -130,26 +130,26 @@ typedef struct SwsContext {
      * 在调用垂直缩放器之前进行包装。
      */
     //@{
-    int lastInLumBuf;             ///< 源图像最后一个缩放的水平亮度/透明度行在环形缓冲区中
+    int lastInLumBuf;             ///< 源图像最后一个缩放的水平亮度行在环形缓冲区中
     int lastInChrBuf;             ///< 源图像最后一个缩放的水平色度行在环形缓冲区中
-    int lumBufIndex;              ///< 最后一个缩放的水平亮度/透明度行在环形缓冲区中的索引
+    int lumBufIndex;              ///< 最后一个缩放的水平亮度行在环形缓冲区中的索引
     int chrBufIndex;              ///< 最后一个缩放的水平色度行在环形缓冲区中的索引
     //@}
 
-    int16_t *hLumFilter;          ///< 亮度/透明度平面的水平滤波系数数组
+    int16_t *hLumFilter;          ///< 亮度平面的水平滤波系数数组
     int16_t *hChrFilter;          ///< 色度平面的水平滤波系数数组
-    int16_t *vLumFilter;          ///< 亮度/透明度平面的垂直滤波系数数组
+    int16_t *vLumFilter;          ///< 亮度平面的垂直滤波系数数组
     int16_t *vChrFilter;          ///< 色度平面的垂直滤波系数数组
-    int32_t *hLumFilterPos;       ///< 每个dst[i]的亮度/透明度平面的水平滤波起始位置数组
+    int32_t *hLumFilterPos;       ///< 每个dst[i]的亮度平面的水平滤波起始位置数组
     int32_t *hChrFilterPos;       ///< 每个dst[i]的色度平面的水平滤波起始位置数组
-    int32_t *vLumFilterPos;       ///< 每个dst[i]的亮度/透明度平面的垂直滤波起始位置数组
+    int32_t *vLumFilterPos;       ///< 每个dst[i]的亮度平面的垂直滤波起始位置数组
     int32_t *vChrFilterPos;       ///< 每个dst[i]的色度平面的垂直滤波起始位置数组
-    int hLumFilterSize;           ///< 亮度/透明度像素的水平滤波大小
-    int hChrFilterSize;           ///< 色度像素的水平滤波大小
-    int vLumFilterSize;           ///< 亮度/透明度像素的垂直滤波大小
-    int vChrFilterSize;           ///< 色度像素的垂直滤波大小
-    int dstW;                     ///< 目标亮度/透明度平面的宽度
-    int dstY;                     ///< 最后一个从最后一个切片输出的目标垂直线
+    int hLumFilterSize;           ///< 亮度像素的水平滤波器大小
+    int hChrFilterSize;           ///< 色度像素的水平滤波器大小
+    int vLumFilterSize;           ///< 亮度像素的垂直滤波器大小
+    int vChrFilterSize;           ///< 色度像素的垂直滤波器大小
+    int dstW;                     ///< 目标亮度平面的宽度
+    int dstY;                     ///< 从最后一个切片输出的最后一个目标垂直线,即每次处理的列索引，遍历处理直到最后一列
     int flags;                   ///< 用户传递的标志，选择缩放器算法、优化、子采样等...
 
 
@@ -159,14 +159,13 @@ typedef struct SwsContext {
     yuv2planarX_fn yuv2planeX;
     yuv2interleavedX_fn yuv2nv12cX;
 
-    /// 未缩放的色度平面转换为YV12用于水平缩放器。
-    void (*chrToYV12)(uint8_t *dstU, uint8_t *dstV,
-                      const uint8_t *src1, const uint8_t *src2, const uint8_t *src3,
-                      int width);
-
+    /// 色度平面转为UV交错排列的方式，没有缩放操作
+    void (*chrToYV12)(uint8_t *dstU, uint8_t *dstV, const uint8_t *src1, int width);
+    // 水平缩放函数
     void (*hyScale)(struct SwsContext *c, int16_t *dst, int dstW,
                     const uint8_t *src, const int16_t *filter,
                     const int32_t *filterPos, int filterSize);
+    //  垂直缩放函数
     void (*hcScale)(struct SwsContext *c, int16_t *dst, int dstW,
                     const uint8_t *src, const int16_t *filter,
                     const int32_t *filterPos, int filterSize);

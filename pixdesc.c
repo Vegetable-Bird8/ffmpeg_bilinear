@@ -9,48 +9,28 @@ static const AVPixFmtDescriptor av_pix_fmt_descriptors[] = {
         .nb_components = 3,
         .log2_chroma_w = 1,
         .log2_chroma_h = 1,
-        .comp = {
-            { 0, 1, 0, 0, 8/*, 0, 7, 1 */},        /* Y */
-            { 1, 1, 0, 0, 8/*, 0, 7, 1 */},        /* U */
-            { 2, 1, 0, 0, 8/*, 0, 7, 1 */},        /* V */
-        },
-        .flags = AV_PIX_FMT_FLAG_PLANAR,
+        .bpc           = 8,
     },
     [AV_PIX_FMT_YUV444P] = {
         .name = "yuv444p",
         .nb_components = 3,
         .log2_chroma_w = 0,
         .log2_chroma_h = 0,
-        .comp = {
-            { 0, 1, 0, 0, 8/*, 0, 7, 1 */},        /* Y */
-            { 1, 1, 0, 0, 8/*, 0, 7, 1 */},        /* U */
-            { 2, 1, 0, 0, 8/*, 0, 7, 1 */},        /* V */
-        },
-        .flags = AV_PIX_FMT_FLAG_PLANAR,
+        .bpc           = 8,
     },
     [AV_PIX_FMT_NV12] = {
         .name = "nv12",
         .nb_components = 3,
         .log2_chroma_w = 1,
         .log2_chroma_h = 1,
-        .comp = {
-            { 0, 1, 0, 0, 8/*, 0, 7, 1 */},        /* Y */
-            { 1, 2, 0, 0, 8/*, 1, 7, 1 */},        /* U */
-            { 1, 2, 1, 0, 8/*, 1, 7, 2 */},        /* V */
-        },
-        .flags = AV_PIX_FMT_FLAG_PLANAR,
+        .bpc           = 8,
     },
     [AV_PIX_FMT_NV21] = {
         .name = "nv21",
         .nb_components = 3,
         .log2_chroma_w = 1,
         .log2_chroma_h = 1,
-        .comp = {
-            { 0, 1, 0, 0, 8/*, 0, 7, 1 */},        /* Y */
-            { 1, 2, 1, 0, 8/*, 1, 7, 2 */},        /* U */
-            { 1, 2, 0, 0, 8/*, 1, 7, 1 */},        /* V */
-        },
-        .flags = AV_PIX_FMT_FLAG_PLANAR,
+        .bpc           = 8,
     }
 };
 
@@ -62,7 +42,7 @@ int av_get_bits_per_pixel(const AVPixFmtDescriptor *pixdesc)
 
     for (c = 0; c < pixdesc->nb_components; c++) {
         int s = c == 1 || c == 2 ? 0 : log2_pixels;
-        bits += pixdesc->comp[c].depth << s;
+        bits += pixdesc->bpc << s;
     }
 
     return bits >> log2_pixels;

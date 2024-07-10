@@ -129,7 +129,7 @@ int main(int argc, char* argv[])
 
     if (argc != 8)
     {
-        fprintf(stderr, "Usage:%s <YUV FILE PATH> <srcW> <srcH> <pixformat> <dstW> <dstH> <YUV OUT PATH>\n", argv[0]);
+        fprintf(stderr, "Usage:%s <YUV IN PATH> <srcW> <srcH> <pixformat> <dstW> <dstH> <YUV OUT PATH>\n", argv[0]);
         return -1;
     }
     int ret;
@@ -148,7 +148,7 @@ int main(int argc, char* argv[])
     outframe = av_mallocz(sizeof(AVFrame));
 
     initAVFrame(outframe, dstW, dstH, infmt);
-    // 过量分配内存，防止溢出
+
     outframe->data[0] = av_mallocz(outframe->Ysize);
     outframe->data[1] = av_mallocz(outframe->Ysize);
     outframe->data[2] = av_mallocz(outframe->Ysize);
@@ -158,12 +158,6 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-
-    const AVPixFmtDescriptor *desc = av_pix_fmt_desc_get(infmt);  // 获取format
-    struct SwsContext *sws;
-
-    // int in_v_chr_pos = -513;
-    // int out_v_chr_pos = -513;
     struct SwsContext *s = av_mallocz(sizeof(SwsContext));
 
     if (!s)
@@ -177,22 +171,6 @@ int main(int argc, char* argv[])
     s->dstFormat = outfmt;
     s->flags = 2;
     s->chrDstHSubSample = s->chrDstVSubSample = s->chrSrcHSubSample = s->chrSrcVSubSample = inframe->subsample;
-
-    /* Override YUV420P default settings to have the correct (MPEG-2) chroma positions
-    * MPEG-2 chroma positions are used by convention
-    * XXX: support other 4:2:0 pixel formats */
-    // if (infmt == AV_PIX_FMT_YUV420P && in_v_chr_pos == -513) {
-    //     in_v_chr_pos = 128;
-    // }
-
-    // if (outfmt == AV_PIX_FMT_YUV420P && out_v_chr_pos == -513) {
-    //     out_v_chr_pos = 128;
-    // }
-
-    // s->src_h_chr_pos = -513;
-    // s->src_v_chr_pos = in_v_chr_pos;
-    // s->dst_h_chr_pos = -513;
-    // s->dst_v_chr_pos = out_v_chr_pos;
 
     if ((ret = sws_init_context(s)) < 0) // 初始化，这里初始化了filter
         return ret;

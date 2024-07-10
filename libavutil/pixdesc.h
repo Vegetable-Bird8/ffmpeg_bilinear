@@ -71,22 +71,13 @@ typedef struct AVPixFmtDescriptor {
      * This value only refers to the chroma components.
      */
     uint8_t log2_chroma_h;
+    //位深 一般都为8
+    int bpc;
 
-    /**
-     * Parameters that describe how pixels are packed.
-     * If the format has 1 or 2 components, then luma is 0.
-     * If the format has 3 or 4 components:
-     *   if the RGB flag is set then 0 is red, 1 is green and 2 is blue;
-     *   otherwise 0 is luma, 1 is chroma-U and 2 is chroma-V.
-     *
-     * If present, the Alpha channel is always the last component.
-     */
-    AVComponentDescriptor comp[4];
-
-    /**
-     * Combination of AV_PIX_FMT_FLAG_... flags.
-     */
-    uint64_t flags;
+    // /**
+    //  * Combination of AV_PIX_FMT_FLAG_... flags.
+    //  */
+    // uint64_t flags;
 
 } AVPixFmtDescriptor;
 
